@@ -1,0 +1,45 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { AssetIcon } from "@/components/AssetIcon";
+import { AuthRequired } from "@/components/AuthRequired";
+import { QrCode } from "@/components/QrCode";
+import { WalletLayout } from "@/components/WalletLayout";
+import { useWalletStore } from "@/state/walletStore";
+import { shortAddress } from "@/utils/formatters";
+
+export default function ReceivePage() {
+  const params = useParams<{ id: string }>();
+  const { session, getAsset, loading } = useWalletStore();
+  const asset = getAsset(params.id);
+
+  if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
+  if (!asset && loading) return <WalletLayout><div className="p-6">Loading receive flow</div></WalletLayout>;
+  if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
+
+  return (
+    <WalletLayout>
+      <section className="screen-enter px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <Link href={`/asset/${asset.id}`} className="text-sm font-semibold text-blue-600">Back</Link>
+        <div className="mt-5 rounded-[28px] bg-white p-5 text-center shadow-sm ring-1 ring-slate-100">
+          <div className="flex items-center gap-3 text-left">
+            <AssetIcon asset={asset} />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-black">Receive {asset.symbol}</h1>
+              <p className="text-sm text-slate-500">{asset.network}</p>
+            </div>
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <QrCode value={asset.displayAddress} />
+          </div>
+
+          <p className="mt-8 text-sm font-semibold text-slate-500">Configured display address</p>
+          <p className="mt-2 break-all rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-900">{shortAddress(asset.displayAddress)}</p>
+          <p className="mt-4 text-sm leading-6 text-slate-500">Simulator data only. Do not send real funds to this display address.</p>
+        </div>
+      </section>
+    </WalletLayout>
+  );
+}

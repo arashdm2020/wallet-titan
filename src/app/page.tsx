@@ -45,7 +45,7 @@ export default function Home() {
 
         {error ? <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{error}</div> : null}
 
-        <div className="mt-6 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <div className="mt-5 rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-bold">Assets</h2>
             <span className="text-xs font-semibold text-slate-400">{loading ? "Loading" : `${portfolio?.assets.length ?? 0} enabled`}</span>
@@ -53,7 +53,7 @@ export default function Home() {
 
           <div className="divide-y divide-slate-100">
             {portfolio?.assets.map((asset) => (
-              <Link key={asset.id} href={`/asset/${asset.id}`} data-testid={`asset-row-${asset.id}`} className="flex items-center gap-3 py-4">
+              <Link key={asset.id} href={`/asset/${asset.id}`} data-testid={`asset-row-${asset.id}`} className="flex items-center gap-3 py-3">
                 <AssetIcon asset={asset} />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-slate-950">{asset.name}</p>
@@ -80,7 +80,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-3 gap-2">
           <InfoTile title="Live markets" body="USD quotes refresh automatically" />
           <InfoTile title="Private access" body="Password-protected sessions" />
           <InfoTile title="PWA ready" body="Install from mobile browser" />

@@ -20,9 +20,9 @@ export default function ReceivePage() {
 
   return (
     <WalletLayout>
-      <section className="screen-enter px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <section className="screen-enter px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <Link href={`/asset/${asset.id}`} className="text-sm font-semibold text-blue-600">Back</Link>
-        <div className="mt-5 rounded-[28px] bg-white p-5 text-center shadow-sm ring-1 ring-slate-100">
+        <div className="mt-3 rounded-[24px] bg-white p-4 text-center shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center gap-3 text-left">
             <AssetIcon asset={asset} />
             <div className="min-w-0 flex-1">
@@ -31,11 +31,11 @@ export default function ReceivePage() {
             </div>
           </div>
 
-          <div className="mt-8 flex justify-center">
+          <div className="mt-5 flex justify-center">
             <QrCode value={asset.displayAddress} />
           </div>
 
-          <div className="mt-8">
+          <div className="mt-5">
             <WalletAddressDisplay address={asset.displayAddress} network={asset.network} label="Receiving address" showFull />
           </div>
         </div>

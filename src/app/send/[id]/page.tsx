@@ -48,9 +48,9 @@ export default function SendPage() {
 
   return (
     <WalletLayout>
-      <section className="screen-enter px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <section className="screen-enter px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <Link href={`/asset/${asset.id}`} className="text-sm font-semibold text-blue-600">Back</Link>
-        <div className="mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="mt-3 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center gap-3">
             <AssetIcon asset={asset} />
             <div className="min-w-0 flex-1">
@@ -59,7 +59,7 @@ export default function SendPage() {
             </div>
           </div>
 
-          <label className="mt-8 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient wallet</label>
+          <label className="mt-6 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient wallet</label>
           {recipient && recipientValidation.valid && !editingRecipient ? (
             <div className="mt-2">
               <WalletAddressDisplay address={recipient} network={asset.network} label="Recipient address" onEdit={() => setEditingRecipient(true)} />
@@ -78,7 +78,7 @@ export default function SendPage() {
           )}
           {recipient && !recipientValidation.valid ? <p className="mt-2 text-xs font-semibold text-rose-500">{recipientValidation.error}</p> : null}
 
-          <label className="mt-5 block text-sm font-semibold text-slate-600" htmlFor="amount">Amount</label>
+          <label className="mt-4 block text-sm font-semibold text-slate-600" htmlFor="amount">Amount</label>
           <div className="mt-2 flex gap-2">
             <input
               id="amount"
@@ -92,12 +92,12 @@ export default function SendPage() {
           </div>
           {amount && !amountValid ? <p className="mt-2 text-xs font-semibold text-rose-500">Enter an amount up to the available balance.</p> : null}
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-slate-50 p-3">
               <p className="text-xs font-semibold text-slate-500">Available</p>
               <p className="mt-1 font-bold">{formatCrypto(asset.availableBalance ?? asset.balance, asset.symbol)}</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="rounded-2xl bg-slate-50 p-3">
               <p className="text-xs font-semibold text-slate-500">Network fee</p>
               <p className="mt-1 font-bold">{formatUsd(0)}</p>
             </div>
@@ -107,7 +107,7 @@ export default function SendPage() {
             disabled={!canConfirm}
             onClick={confirm}
             data-testid="confirm-transfer"
-            className="mt-6 h-14 w-full rounded-2xl bg-blue-600 text-base font-bold text-white shadow-lg shadow-blue-600/20 disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+            className="mt-4 h-[52px] w-full rounded-2xl bg-blue-600 text-base font-bold text-white shadow-lg shadow-blue-600/20 disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
           >
             {busy ? "Creating Transfer" : "Confirm Transfer"}
           </button>

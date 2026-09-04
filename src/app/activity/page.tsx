@@ -15,16 +15,16 @@ export default function ActivityPage() {
 
   return (
     <WalletLayout>
-      <section className="screen-enter px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <section className="screen-enter px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <h1 className="text-2xl font-black">Activity</h1>
         <p className="mt-1 text-sm text-slate-500">Recent transfers</p>
 
-        <div className="mt-6 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <div className="mt-4 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="divide-y divide-slate-100">
             {activities.map((activity) => {
               const asset = getAsset(activity.assetId);
               return (
-                <Link key={activity.id} href={`/transfer/${activity.id}`} className="block py-4">
+                <Link key={activity.id} href={`/transfer/${activity.id}`} className="block py-3">
                   <div className="flex items-center gap-3">
                     <AssetIcon asset={asset} />
                     <div className="min-w-0 flex-1">
@@ -33,7 +33,7 @@ export default function ActivityPage() {
                     </div>
                     <StatusPill status={activity.status} />
                   </div>
-                  <p className="mt-3 font-semibold">{formatCrypto(activity.amount, asset?.symbol || "")}</p>
+                  <p className="mt-2 font-semibold">{formatCrypto(activity.amount, asset?.symbol || "")}</p>
                   {activity.status === "processing" && activity.type === "send" ? (
                     <p className="mt-1 text-xs font-semibold text-amber-600">Pending completion ({formatCrypto(activity.pendingAmount || Math.abs(activity.amount), asset?.symbol || "")})</p>
                   ) : null}

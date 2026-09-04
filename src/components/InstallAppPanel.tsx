@@ -64,7 +64,7 @@ export function InstallAppPanel() {
     <div className="mt-4 rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="font-bold">Install App</p>
+          <p className="font-bold">Install Titan Wallet</p>
           <p className="mt-1 text-sm leading-6 text-slate-500">Add this wallet to your home screen for a standalone app-style experience.</p>
         </div>
         <button onClick={install} className="shrink-0 rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white">
@@ -76,7 +76,7 @@ export function InstallAppPanel() {
         <div className="fixed inset-0 z-40 flex items-end bg-slate-950/40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="w-full rounded-t-[28px] bg-white p-5 shadow-2xl">
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
-            <h2 className="text-xl font-black">Install App</h2>
+            <h2 className="text-xl font-black">Install Titan Wallet</h2>
             <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
               <li>1. Tap the Share button in Safari.</li>
               <li>2. Choose Add to Home Screen.</li>

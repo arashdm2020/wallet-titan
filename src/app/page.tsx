@@ -68,6 +68,9 @@ export default function Home() {
                       Incoming processing {formatCrypto(asset.processingIncoming || asset.processingAmount || 0, asset.symbol)} · Total {formatCrypto(asset.pendingIncomingTotal, asset.symbol)}
                     </p>
                   ) : null}
+                  {asset.nextHourIncoming ? (
+                    <p className="mt-1 text-xs font-semibold text-blue-500">(+{formatCrypto(asset.nextHourIncoming, asset.symbol)} next hour)</p>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <p data-testid={`asset-value-${asset.id}`} className="font-bold text-slate-950">{formatUsd(asset.usdValue)}</p>
@@ -130,16 +133,16 @@ function Onboarding({
       <div className="overflow-hidden rounded-[28px] bg-blue-700 p-5 text-white shadow-xl shadow-blue-900/20">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-blue-100">Secure portfolio access</p>
-            <h1 className="text-3xl font-black">Titan Wallet</h1>
+            <p className="text-sm text-blue-100">Wallet onboarding</p>
+            <h1 className="text-3xl font-black">Add your wallet</h1>
           </div>
           <Image src="/brand/titan-wallet.png" alt="" width={64} height={64} className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-blue-950/20" priority />
         </div>
-        <p className="mt-8 text-sm leading-6 text-blue-50">Track your crypto portfolio with live USD pricing, clear wallet activity, and simple transfer flows.</p>
+        <p className="mt-8 text-sm leading-6 text-blue-50">Connect an existing Titan Wallet account or create a new wallet to view your portfolio.</p>
       </div>
 
       <div className="mt-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
-        <button className={`h-11 rounded-xl text-sm font-bold ${mode === "sign-in" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("sign-in")}>Sign In</button>
+        <button className={`h-11 rounded-xl text-sm font-bold ${mode === "sign-in" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("sign-in")}>Connect Existing</button>
         <button className={`h-11 rounded-xl text-sm font-bold ${mode === "create" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("create")}>Create New</button>
       </div>
 
@@ -148,7 +151,7 @@ function Onboarding({
         <Field label="Password" value={password} onChange={setPassword} type="password" autoComplete={mode === "sign-in" ? "current-password" : "new-password"} />
         {mode === "create" ? <Field label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} type="password" autoComplete="new-password" /> : null}
         <button disabled={busy} className="mt-6 h-14 w-full rounded-2xl bg-blue-600 font-bold text-white disabled:bg-slate-300" type="submit">
-          {busy ? "Working" : mode === "sign-in" ? "Sign In" : "Create New Wallet"}
+          {busy ? "Working" : mode === "sign-in" ? "Connect Account" : "Create New Wallet"}
         </button>
       </form>
 

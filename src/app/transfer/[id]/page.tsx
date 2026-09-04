@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { WalletLayout } from "@/components/WalletLayout";
 import type { WalletTransfer } from "@/domain/wallet";
-import { formatCrypto, formatDateTime, shortAddress } from "@/utils/formatters";
+import { formatCrypto, formatDateTime } from "@/utils/formatters";
 
 export default function TransferPage() {
   const params = useParams<{ id: string }>();
@@ -95,7 +96,7 @@ export default function TransferPage() {
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Info label="Status" value={capitalize(transfer.status)} compact />
+            <Info label="Status" value={transfer.status === "processing" ? "Pending" : capitalize(transfer.status)} compact />
             <Info label="Environment" value="Sandbox" compact />
           </div>
 
@@ -125,8 +126,8 @@ export default function TransferPage() {
           )}
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Info label="Sender" value={shortAddress(transfer.senderDisplayAddress)} compact />
-            <Info label="Recipient" value={shortAddress(transfer.recipientDisplayAddress)} compact />
+            <WalletAddressDisplay address={transfer.senderDisplayAddress} network={transfer.network} label="Sender" />
+            <WalletAddressDisplay address={transfer.recipientDisplayAddress} network={transfer.network} label="Recipient" />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
           {transfer.completedAt ? <Info label="Completed" value={formatDateTime(transfer.completedAt)} /> : null}

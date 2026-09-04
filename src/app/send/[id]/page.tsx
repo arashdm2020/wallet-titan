@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
 import { useToast } from "@/components/ToastProvider";
+import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { WalletLayout } from "@/components/WalletLayout";
 import { validateRecipientAddress } from "@/domain/address";
 import { useWalletStore } from "@/state/walletStore";
@@ -18,6 +19,7 @@ export default function SendPage() {
   const asset = getPortfolioAsset(params.id);
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [editingRecipient, setEditingRecipient] = useState(true);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const recipientValidation = useMemo(() => (asset ? validateRecipientAddress(recipient, asset) : { valid: false, error: "" }), [asset, recipient]);
@@ -57,16 +59,23 @@ export default function SendPage() {
             </div>
           </div>
 
-          <label className="mt-8 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient</label>
-          <input
-            id="address"
-            type="password"
-            value={recipient}
-            onChange={(event) => setRecipient(event.target.value)}
-            autoComplete="off"
-            placeholder="Wallet account"
-            className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-blue-500 focus:bg-white"
-          />
+          <label className="mt-8 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient wallet</label>
+          {recipient && recipientValidation.valid && !editingRecipient ? (
+            <div className="mt-2">
+              <WalletAddressDisplay address={recipient} network={asset.network} label="Recipient address" onEdit={() => setEditingRecipient(true)} />
+            </div>
+          ) : (
+            <input
+              id="address"
+              type="text"
+              value={recipient}
+              onChange={(event) => setRecipient(event.target.value)}
+              onBlur={() => { if (recipientValidation.valid) setEditingRecipient(false); }}
+              autoComplete="off"
+              placeholder="Enter wallet address"
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-blue-500 focus:bg-white"
+            />
+          )}
           {recipient && !recipientValidation.valid ? <p className="mt-2 text-xs font-semibold text-rose-500">{recipientValidation.error}</p> : null}
 
           <label className="mt-5 block text-sm font-semibold text-slate-600" htmlFor="amount">Amount</label>

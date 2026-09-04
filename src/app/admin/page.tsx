@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { PhoneShell } from "@/components/PhoneShell";
+import { LoadingButtonContent, PageLoader, Spinner } from "@/components/LoadingUI";
 import { useToast } from "@/components/ToastProvider";
 import type { WalletTransfer } from "@/domain/wallet";
 import { formatCrypto, formatDateTime } from "@/utils/formatters";
@@ -28,6 +29,7 @@ export default function AdminPage() {
   const [snapshot, setSnapshot] = useState<AdminSnapshot | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
   const toast = useToast();
 
   const load = async () => {
@@ -42,22 +44,27 @@ export default function AdminPage() {
   };
 
   const adminAction = async (body: Record<string, unknown>) => {
+    setActionBusy(true);
     setMessage("");
     setError("");
-    const response = await fetch("/api/admin/snapshot", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error || "Admin action failed");
-      toast({ tone: "error", title: "Admin action failed", description: data.error || "Unable to save changes" });
-      return;
+    try {
+      const response = await fetch("/api/admin/snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "Admin action failed");
+        toast({ tone: "error", title: "Admin action failed", description: data.error || "Unable to save changes" });
+        return;
+      }
+      setSnapshot(data);
+      setMessage("Saved.");
+      toast({ tone: "success", title: "Saved", description: "Admin changes were applied." });
+    } finally {
+      setActionBusy(false);
     }
-    setSnapshot(data);
-    setMessage("Saved.");
-    toast({ tone: "success", title: "Saved", description: "Admin changes were applied." });
   };
 
   useEffect(() => {
@@ -93,14 +100,14 @@ export default function AdminPage() {
 
         {message ? <div className="mt-4 rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{message}</div> : null}
         {error ? <div className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">{error}</div> : null}
-        {!snapshot ? <div className="mt-5 rounded-[24px] bg-white p-5">Loading admin data</div> : (
+        {!snapshot ? <PageLoader label="Loading admin data" /> : (
           <>
-            <CreateUserForm onSubmit={adminAction} />
-            <UsersPanel snapshot={snapshot} onSubmit={adminAction} />
-            <AssetsPanel snapshot={snapshot} onSubmit={adminAction} />
-            <SettingsForm snapshot={snapshot} onSubmit={adminAction} />
-            <BalancesPanel snapshot={snapshot} onSubmit={adminAction} />
-            <TransferForm snapshot={snapshot} onSubmit={adminAction} />
+            <CreateUserForm onSubmit={adminAction} busy={actionBusy} />
+            <UsersPanel snapshot={snapshot} onSubmit={adminAction} busy={actionBusy} />
+            <AssetsPanel snapshot={snapshot} onSubmit={adminAction} busy={actionBusy} />
+            <SettingsForm snapshot={snapshot} onSubmit={adminAction} busy={actionBusy} />
+            <BalancesPanel snapshot={snapshot} onSubmit={adminAction} busy={actionBusy} />
+            <TransferForm snapshot={snapshot} onSubmit={adminAction} busy={actionBusy} />
             <TransfersPanel transfers={snapshot.transfers} />
           </>
         )}
@@ -109,7 +116,7 @@ export default function AdminPage() {
   );
 }
 
-function UsersPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function UsersPanel({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   const [passwords, setPasswords] = useState<Record<string, string>>({});
   return (
     <div className="mt-5 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -123,7 +130,7 @@ function UsersPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit:
                 <p className="text-sm text-slate-500">{user.username} · {user.role} · {user.enabled ? "enabled" : "disabled"}</p>
               </div>
               <button
-                disabled={user.role === "ADMIN"}
+                disabled={busy || user.role === "ADMIN"}
                 onClick={() => onSubmit({ action: "setUserEnabled", userId: user.id, enabled: !user.enabled })}
                 className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-40"
               >
@@ -132,7 +139,10 @@ function UsersPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit:
             </div>
             <form className="mt-2 grid grid-cols-[1fr_92px] gap-2" onSubmit={(event) => { event.preventDefault(); onSubmit({ action: "resetPassword", userId: user.id, password: passwords[user.id] || "" }); }}>
               <input type="password" placeholder="New password" value={passwords[user.id] || ""} onChange={(event) => setPasswords({ ...passwords, [user.id]: event.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
-              <button className="rounded-xl bg-slate-900 text-xs font-bold text-white">Reset</button>
+              <button disabled={busy} className="inline-flex items-center justify-center gap-1 rounded-xl bg-slate-900 text-xs font-bold text-white disabled:opacity-60">
+                {busy ? <Spinner size="sm" /> : null}
+                <span>Reset</span>
+              </button>
             </form>
           </div>
         ))}
@@ -141,7 +151,7 @@ function UsersPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit:
   );
 }
 
-function AssetsPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function AssetsPanel({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   const emptyAsset = { id: "", symbol: "", name: "", network: "", displayAddress: "", enabled: true, withdrawalEnabled: false, withdrawalAvailableAt: "" };
   const [draft, setDraft] = useState(emptyAsset);
   return (
@@ -161,7 +171,7 @@ function AssetsPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit
               <p className="font-semibold">{asset.name} ({asset.symbol})</p>
               <p className="truncate text-sm text-slate-500">{asset.network} · {asset.enabled ? "enabled" : "disabled"}</p>
             </button>
-            <button type="button" onClick={() => onSubmit({ action: "deleteAsset", assetId: asset.id })} className="text-sm font-bold text-rose-600">Remove</button>
+            <button type="button" disabled={busy} onClick={() => onSubmit({ action: "deleteAsset", assetId: asset.id })} className="text-sm font-bold text-rose-600 disabled:opacity-50">Remove</button>
           </div>
         ))}
       </div>
@@ -172,13 +182,15 @@ function AssetsPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit
       <Field label="Withdrawal available at" value={draft.withdrawalAvailableAt || ""} onChange={(value) => setDraft({ ...draft, withdrawalAvailableAt: value })} />
       <Toggle label="Enabled" checked={draft.enabled} onChange={(value) => setDraft({ ...draft, enabled: value })} />
       <Toggle label="Withdrawal enabled" checked={draft.withdrawalEnabled} onChange={(value) => setDraft({ ...draft, withdrawalEnabled: value })} />
-      <button className="mt-5 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white">Save asset</button>
+      <button disabled={busy} className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-blue-600 font-bold text-white disabled:opacity-60">
+        <LoadingButtonContent loading={busy} loadingLabel="Saving...">Save asset</LoadingButtonContent>
+      </button>
       {draft.id ? <button type="button" onClick={() => setDraft(emptyAsset)} className="mt-2 w-full py-2 text-sm font-bold text-blue-600">Clear asset form</button> : null}
     </form>
   );
 }
 
-function CreateUserForm({ onSubmit }: { onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function CreateUserForm({ onSubmit, busy }: { onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("password123");
   const [displayName, setDisplayName] = useState("");
@@ -194,12 +206,14 @@ function CreateUserForm({ onSubmit }: { onSubmit: (body: Record<string, unknown>
       <Field label="Username" value={username} onChange={setUsername} />
       <Field label="Display name" value={displayName} onChange={setDisplayName} />
       <Field label="Temporary password" value={password} onChange={setPassword} type="password" />
-      <button className="mt-5 h-12 w-full rounded-2xl bg-slate-900 font-bold text-white">Create zero-balance wallet</button>
+      <button disabled={busy} className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-slate-900 font-bold text-white disabled:opacity-60">
+        <LoadingButtonContent loading={busy} loadingLabel="Creating...">Create zero-balance wallet</LoadingButtonContent>
+      </button>
     </form>
   );
 }
 
-function SettingsForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function SettingsForm({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   const [defaultMode, setDefaultMode] = useState(snapshot.settings.default_settlement_mode);
   const defaultSeconds = snapshot.settings.default_duration_seconds ?? snapshot.settings.default_duration_minutes * 60;
   const maxSeconds = snapshot.settings.max_duration_seconds ?? snapshot.settings.max_duration_minutes * 60;
@@ -239,12 +253,14 @@ function SettingsForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmi
       <Field label="Processing reason" value={reason} onChange={setReason} />
       <Toggle label="Immediate enabled" checked={immediateEnabled} onChange={setImmediateEnabled} />
       <Toggle label="Scheduled enabled" checked={scheduledEnabled} onChange={setScheduledEnabled} />
-      <button className="mt-5 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white">Save settings</button>
+      <button disabled={busy} className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-blue-600 font-bold text-white disabled:opacity-60">
+        <LoadingButtonContent loading={busy} loadingLabel="Saving...">Save settings</LoadingButtonContent>
+      </button>
     </form>
   );
 }
 
-function BalancesPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function BalancesPanel({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   return (
     <div className="mt-5 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
       <h2 className="font-bold">Wallet balances</h2>
@@ -255,7 +271,7 @@ function BalancesPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubm
             <div className="mt-2 space-y-2">
               {snapshot.assets.map((asset) => {
                 const balance = snapshot.balances.find((item) => item.walletId === user.walletId && item.assetId === asset.id);
-                return <BalanceEditor key={asset.id} walletId={user.walletId} asset={asset} amount={balance?.amountDisplay || "0"} onSubmit={onSubmit} />;
+                return <BalanceEditor key={asset.id} walletId={user.walletId} asset={asset} amount={balance?.amountDisplay || "0"} onSubmit={onSubmit} busy={busy} />;
               })}
             </div>
           </div>
@@ -265,7 +281,7 @@ function BalancesPanel({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubm
   );
 }
 
-function BalanceEditor({ walletId, asset, amount, onSubmit }: { walletId: string; asset: AdminSnapshot["assets"][number]; amount: string; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function BalanceEditor({ walletId, asset, amount, onSubmit, busy }: { walletId: string; asset: AdminSnapshot["assets"][number]; amount: string; onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   const [value, setValue] = useState(amount);
   return (
     <form className="grid grid-cols-[1fr_92px] items-center gap-2" onSubmit={(event) => { event.preventDefault(); onSubmit({ action: "setBalance", walletId, assetId: asset.id, amount: value }); }}>
@@ -273,12 +289,15 @@ function BalanceEditor({ walletId, asset, amount, onSubmit }: { walletId: string
         {asset.symbol}
         <input value={value} onChange={(event) => setValue(event.target.value)} inputMode="decimal" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
       </label>
-      <button className="mt-6 h-10 rounded-xl bg-slate-900 text-sm font-bold text-white">Set</button>
+      <button disabled={busy} className="mt-6 inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-slate-900 text-sm font-bold text-white disabled:opacity-60">
+        {busy ? <Spinner size="sm" /> : null}
+        <span>Set</span>
+      </button>
     </form>
   );
 }
 
-function TransferForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
+function TransferForm({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
   const admin = useMemo(() => snapshot.users.find((user) => user.role === "ADMIN"), [snapshot.users]);
   const [recipient, setRecipient] = useState("");
   const [assetId, setAssetId] = useState(snapshot.assets[0]?.id || "");
@@ -299,7 +318,9 @@ function TransferForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmi
       </select>
       <Field label="Amount" value={amount} onChange={setAmount} inputMode="decimal" />
       <p className="mt-3 text-xs font-semibold text-slate-500">Uses current settlement mode: {snapshot.settings.default_settlement_mode}</p>
-      <button className="mt-5 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white">Create transfer</button>
+      <button disabled={busy} className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-blue-600 font-bold text-white disabled:opacity-60">
+        <LoadingButtonContent loading={busy} loadingLabel="Creating...">Create transfer</LoadingButtonContent>
+      </button>
     </form>
   );
 }

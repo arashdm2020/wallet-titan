@@ -5,6 +5,7 @@ import { notFound, useParams } from "next/navigation";
 import { ActionButton } from "@/components/ActionButton";
 import { AuthRequired } from "@/components/AuthRequired";
 import { AssetIcon } from "@/components/AssetIcon";
+import { PageLoader } from "@/components/LoadingUI";
 import { StatusPill } from "@/components/StatusPill";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
@@ -17,7 +18,7 @@ export default function AssetDetailPage() {
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
   if (!asset && !loading) notFound();
-  if (!asset) return <WalletLayout><div className="p-6">Loading asset</div></WalletLayout>;
+  if (!asset) return <WalletLayout><PageLoader label="Loading asset" /></WalletLayout>;
 
   const activities = getActivities(asset.id).slice(0, 4);
 

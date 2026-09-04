@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
+import { PageLoader } from "@/components/LoadingUI";
 import { WalletLayout } from "@/components/WalletLayout";
 import type { WalletTransfer } from "@/domain/wallet";
 import { formatCrypto, formatDateTime } from "@/utils/formatters";
@@ -76,7 +77,7 @@ export default function TransferPage() {
   }, [now, transfer]);
 
   if (error) return <WalletLayout><section className="p-6">{error}</section></WalletLayout>;
-  if (!transfer) return <WalletLayout><section className="p-6">Loading transfer</section></WalletLayout>;
+  if (!transfer) return <WalletLayout><PageLoader label="Loading transfer" /></WalletLayout>;
 
   return (
     <WalletLayout>

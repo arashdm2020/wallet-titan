@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
+import { LoadingButtonContent, PageLoader } from "@/components/LoadingUI";
 import { useToast } from "@/components/ToastProvider";
 import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { WalletLayout } from "@/components/WalletLayout";
@@ -27,7 +28,7 @@ export default function SendPage() {
   const amountValid = Number.isFinite(numericAmount) && numericAmount > 0 && numericAmount <= (asset?.availableBalance ?? asset?.balance ?? 0);
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
-  if (!asset && loading) return <WalletLayout><div className="p-6">Loading send flow</div></WalletLayout>;
+  if (!asset && loading) return <WalletLayout><PageLoader label="Loading send flow" /></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
 
   const canConfirm = recipientValidation.valid && amountValid;
@@ -109,7 +110,7 @@ export default function SendPage() {
             data-testid="confirm-transfer"
             className="mt-4 h-[52px] w-full rounded-2xl bg-blue-600 text-base font-bold text-white shadow-lg shadow-blue-600/20 disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
           >
-            {busy ? "Creating Transfer" : "Confirm Transfer"}
+      <LoadingButtonContent loading={busy} loadingLabel="Confirming...">Confirm Transfer</LoadingButtonContent>
           </button>
         </div>
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
+import { PageLoader } from "@/components/LoadingUI";
 import { QrCode } from "@/components/QrCode";
 import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { WalletLayout } from "@/components/WalletLayout";
@@ -15,7 +16,7 @@ export default function ReceivePage() {
   const asset = getAsset(params.id);
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
-  if (!asset && loading) return <WalletLayout><div className="p-6">Loading receive flow</div></WalletLayout>;
+  if (!asset && loading) return <WalletLayout><PageLoader label="Loading receive flow" /></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
 
   return (

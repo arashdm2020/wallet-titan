@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { AssetIcon } from "@/components/AssetIcon";
+import { DashboardSkeleton, LoadingButtonContent, Spinner } from "@/components/LoadingUI";
 import { ServerStatusIndicator } from "@/components/ServerStatusIndicator";
 import { useToast } from "@/components/ToastProvider";
 import { WalletLayout } from "@/components/WalletLayout";
@@ -19,6 +20,10 @@ export default function Home() {
         <Onboarding error={error} onSignIn={signIn} onCreateWallet={createWallet} />
       </WalletLayout>
     );
+  }
+
+  if (loading && !portfolio) {
+    return <WalletLayout><DashboardSkeleton /></WalletLayout>;
   }
 
   return (
@@ -50,7 +55,9 @@ export default function Home() {
         <div className="mt-5 rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-bold">Assets</h2>
-            <span className="text-xs font-semibold text-slate-400">{loading ? "Loading" : `${portfolio?.assets.length ?? 0} enabled`}</span>
+            <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400">
+              {loading ? <Spinner size="sm" className="text-blue-600" /> : `${portfolio?.assets.length ?? 0} enabled`}
+            </span>
           </div>
 
           <div className="divide-y divide-slate-100">
@@ -149,8 +156,10 @@ function Onboarding({
         <Field label="Username" value={username} onChange={setUsername} autoComplete="username" />
         <Field label="Password" value={password} onChange={setPassword} type="password" autoComplete={mode === "sign-in" ? "current-password" : "new-password"} />
         {mode === "create" ? <Field label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} type="password" autoComplete="new-password" /> : null}
-        <button disabled={busy} className="mt-6 h-14 w-full rounded-2xl bg-blue-600 font-bold text-white disabled:bg-slate-300" type="submit">
-          {busy ? "Working" : mode === "sign-in" ? "Connect Account" : "Create New Wallet"}
+        <button disabled={busy} className="mt-6 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-blue-600 font-bold text-white disabled:bg-slate-300" type="submit">
+          <LoadingButtonContent loading={busy} loadingLabel={mode === "sign-in" ? "Connecting..." : "Creating..."}>
+            {mode === "sign-in" ? "Connect Account" : "Create New Wallet"}
+          </LoadingButtonContent>
         </button>
       </form>
 

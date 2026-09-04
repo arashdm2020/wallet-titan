@@ -5,6 +5,7 @@ import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { AuthRequired } from "@/components/AuthRequired";
 import { InstallAppPanel } from "@/components/InstallAppPanel";
+import { LoadingButtonContent } from "@/components/LoadingUI";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/ToastProvider";
 import { WalletLayout } from "@/components/WalletLayout";
@@ -14,6 +15,7 @@ export default function SettingsPage() {
   const { wallet, logout, session, loading, updateDisplayName } = useWalletStore();
   const { theme, toggleTheme } = useTheme();
   const [busy, setBusy] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const toast = useToast();
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
@@ -59,8 +61,8 @@ export default function SettingsPage() {
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-blue-500 focus:bg-white"
             />
           </label>
-          <button disabled={busy} className="mt-4 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white disabled:bg-slate-300">
-            {busy ? "Saving" : "Save Profile"}
+          <button disabled={busy} className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-blue-600 font-bold text-white disabled:bg-slate-300">
+            <LoadingButtonContent loading={busy} loadingLabel="Saving...">Save Profile</LoadingButtonContent>
           </button>
         </form>
 
@@ -76,8 +78,19 @@ export default function SettingsPage() {
               Open Admin
             </Link>
           ) : null}
-          <button onClick={signOut} className="mt-3 h-12 w-full rounded-2xl bg-slate-900 font-bold text-white">
-            Logout
+          <button
+            disabled={logoutBusy}
+            onClick={async () => {
+              setLogoutBusy(true);
+              try {
+                await signOut();
+              } finally {
+                setLogoutBusy(false);
+              }
+            }}
+            className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-slate-900 font-bold text-white disabled:opacity-60"
+          >
+            <LoadingButtonContent loading={logoutBusy} loadingLabel="Signing out...">Logout</LoadingButtonContent>
           </button>
         </div>
 

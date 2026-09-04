@@ -68,9 +68,6 @@ export default function Home() {
                       Incoming processing {formatCrypto(asset.processingIncoming || asset.processingAmount || 0, asset.symbol)} · Total {formatCrypto(asset.pendingIncomingTotal, asset.symbol)}
                     </p>
                   ) : null}
-                  {asset.nextHourIncoming ? (
-                    <p className="mt-1 text-xs font-semibold text-blue-500">(+{formatCrypto(asset.nextHourIncoming, asset.symbol)} next hour)</p>
-                  ) : null}
                 </div>
                 <div className="text-right">
                   <p data-testid={`asset-value-${asset.id}`} className="font-bold text-slate-950">{formatUsd(asset.usdValue)}</p>

@@ -9,18 +9,16 @@ import { StatusPill } from "@/components/StatusPill";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
 import { formatCrypto, formatDateTime, formatPercent, formatUsd, shortAddress } from "@/utils/formatters";
-import { getWithdrawalState } from "@/utils/withdrawal";
 
 export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
-  const { session, getPortfolioAsset, getActivities, now, loading } = useWalletStore();
+  const { session, getPortfolioAsset, getActivities, loading } = useWalletStore();
   const asset = getPortfolioAsset(params.id);
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
   if (!asset && !loading) notFound();
   if (!asset) return <WalletLayout><div className="p-6">Loading asset</div></WalletLayout>;
 
-  const withdrawal = getWithdrawalState(asset, now);
   const activities = getActivities(asset.id).slice(0, 4);
 
   return (
@@ -38,10 +36,22 @@ export default function AssetDetailPage() {
           </div>
 
           <div className="mt-8">
-            <p className="text-sm text-slate-500">Simulated balance</p>
-            <p className="mt-2 text-3xl font-black tracking-tight">{formatCrypto(asset.balance, asset.symbol)}</p>
+            <p className="text-sm text-slate-500">Available</p>
+            <p className="mt-2 text-3xl font-black tracking-tight">{formatCrypto(asset.availableBalance ?? asset.balance, asset.symbol)}</p>
             <p className="mt-1 text-lg font-bold text-slate-500">{formatUsd(asset.usdValue)}</p>
           </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <BalanceMetric label="Pending outgoing" value={asset.pendingOutgoing || 0} symbol={asset.symbol} negative />
+            <BalanceMetric label="Incoming processing" value={asset.processingIncoming || asset.processingAmount || 0} symbol={asset.symbol} />
+          </div>
+          {asset.pendingIncomingTotal ? (
+            <div className="mt-3 rounded-2xl bg-blue-50 p-4 text-blue-900">
+              <p className="text-xs font-semibold uppercase text-blue-500">Incoming total</p>
+              <p className="mt-1 font-bold">{formatCrypto(asset.pendingIncomingTotal, asset.symbol)}</p>
+              <p className="mt-1 text-sm">Remaining {formatCrypto(asset.incomingRemaining || asset.remainingIncomingAmount || 0, asset.symbol)}</p>
+            </div>
+          ) : null}
 
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-50 p-4">
@@ -60,18 +70,9 @@ export default function AssetDetailPage() {
           <ActionButton href={`/receive/${asset.id}`} label="Receive">↓</ActionButton>
         </div>
 
-        <div className="mt-6 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <p className="font-bold">Withdrawal</p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            {withdrawal.available ? "Withdrawal available" : `Withdrawal available ${formatDateTime(asset.withdrawalAvailableAt)}`}
-          </p>
-          {withdrawal.countdown ? <p data-testid="withdrawal-countdown" className="mt-1 text-sm font-bold text-blue-600">Available in {withdrawal.countdown}</p> : null}
-        </div>
-
         <div className="mt-4 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <p className="font-bold">Display address</p>
           <p className="mt-2 break-all text-sm text-slate-500">{shortAddress(asset.displayAddress)}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-400">Simulator display data only. This address is never used for signing.</p>
         </div>
 
         <div className="mt-4 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -93,5 +94,16 @@ export default function AssetDetailPage() {
         </div>
       </section>
     </WalletLayout>
+  );
+}
+
+function BalanceMetric({ label, value, symbol, negative = false }: { label: string; value: number; symbol: string; negative?: boolean }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className={`mt-1 font-bold ${negative && value > 0 ? "text-amber-600" : "text-slate-900"}`}>
+        {negative && value > 0 ? `(${formatCrypto(value, symbol)})` : formatCrypto(value, symbol)}
+      </p>
+    </div>
   );
 }

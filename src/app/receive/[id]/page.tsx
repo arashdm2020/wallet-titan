@@ -37,7 +37,7 @@ export default function ReceivePage() {
 
           <p className="mt-8 text-sm font-semibold text-slate-500">Configured display address</p>
           <p className="mt-2 break-all rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-900">{shortAddress(asset.displayAddress)}</p>
-          <p className="mt-4 text-sm leading-6 text-slate-500">Simulator data only. Do not send real funds to this display address.</p>
+          <p className="mt-4 text-sm leading-6 text-slate-500">Sandbox address. Do not send real funds to this display address.</p>
         </div>
       </section>
     </WalletLayout>

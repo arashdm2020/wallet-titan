@@ -17,7 +17,7 @@ export default function ActivityPage() {
     <WalletLayout>
       <section className="screen-enter px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <h1 className="text-2xl font-black">Activity</h1>
-        <p className="mt-1 text-sm text-slate-500">Configuration-driven simulator records</p>
+        <p className="mt-1 text-sm text-slate-500">Recent transfers</p>
 
         <div className="mt-6 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="divide-y divide-slate-100">
@@ -34,7 +34,15 @@ export default function ActivityPage() {
                     <StatusPill status={activity.status} />
                   </div>
                   <p className="mt-3 font-semibold">{formatCrypto(activity.amount, asset?.symbol || "")}</p>
-                  <p className="mt-1 truncate text-xs text-slate-400">Address {shortAddress(activity.displayAddress)} · simulated tx {activity.txHash || "none"}</p>
+                  {activity.status === "processing" && activity.type === "send" ? (
+                    <p className="mt-1 text-xs font-semibold text-amber-600">Pending completion ({formatCrypto(activity.pendingAmount || Math.abs(activity.amount), asset?.symbol || "")})</p>
+                  ) : null}
+                  {activity.status === "processing" && activity.type === "receive" ? (
+                    <p className="mt-1 text-xs font-semibold text-blue-600">
+                      Processed {formatCrypto(activity.processingAmount || 0, asset?.symbol || "")} · Remaining {formatCrypto(activity.remainingAmount || 0, asset?.symbol || "")}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 truncate text-xs text-slate-400">Address {shortAddress(activity.displayAddress)} · ref {activity.txHash || "none"}</p>
                 </Link>
               );
             })}

@@ -1,4 +1,4 @@
-const CACHE_NAME = "wallet-simulator-v2";
+const CACHE_NAME = "titan-wallet-v3";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

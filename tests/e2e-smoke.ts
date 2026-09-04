@@ -26,13 +26,15 @@ async function main() {
     await waitForEntry(userPage);
     await userPage.getByRole("button", { name: "Create New" }).click();
     await userPage.getByLabel("Username").fill(user);
-    await userPage.getByLabel("Display name").fill("Smoke User");
     await userPage.getByLabel("Password", { exact: true }).fill(pass);
     await userPage.getByLabel("Confirm password").fill(pass);
     await userPage.getByRole("button", { name: "Create New Wallet" }).click();
     await expect(userPage.getByTestId("portfolio-total")).toContainText("$0.00", { timeout: 20_000 });
     await expect(userPage.getByText("4 enabled")).toBeVisible({ timeout: 20_000 });
     await expect(userPage.getByText(/Available 0(\.0+)? BTC/)).toBeVisible();
+    const userWallet = await (await userPage.request.get(`${baseUrl}/api/wallet`)).json();
+    const userBtc = userWallet.assets.find((asset: { symbol: string }) => asset.symbol === "BTC");
+    if (!userBtc?.displayAddress) throw new Error("User BTC address missing");
     await userPage.goto(`${baseUrl}/admin`);
     await expect(userPage.getByText("Admin access required")).toBeVisible();
     await userContext.close();
@@ -41,7 +43,7 @@ async function main() {
     const adminPage = await adminContext.newPage();
     await signIn(adminPage, "admin", "admin123");
     await adminPage.goto(`${baseUrl}/admin`);
-    await expect(adminPage.getByText("Development-only simulator controls")).toBeVisible();
+    await expect(adminPage.getByText("Development-only controls")).toBeVisible();
     const snapshot = await (await adminPage.request.get(`${baseUrl}/api/admin/snapshot`)).json();
     const btc = snapshot.assets.find((asset: { symbol: string }) => asset.symbol === "BTC");
     const adminUser = snapshot.users.find((item: { role: string }) => item.role === "ADMIN");
@@ -50,23 +52,22 @@ async function main() {
       data: { action: "setBalance", walletId: adminUser.walletId, assetId: btc.id, amount: "10" },
     });
     await adminPage.request.post(`${baseUrl}/api/admin/snapshot`, {
-      data: { action: "updateSettings", defaultMode: "scheduled", defaultDurationMinutes: 480, maxDurationMinutes: 720, processingReason: "Full ledger verification from block 0", immediateEnabled: true, scheduledEnabled: true },
+      data: { action: "updateSettings", defaultMode: "scheduled", defaultDurationSeconds: 28_800, maxDurationSeconds: 43_200, processingReason: "Full ledger verification from block 0", immediateEnabled: true, scheduledEnabled: true },
     });
-    const transferResponse = await adminPage.request.post(`${baseUrl}/api/admin/snapshot`, {
-      data: { action: "createTransfer", senderWalletId: adminUser.walletId, recipientUsername: user, assetId: btc.id, amount: "0.01", settlementMode: "scheduled" },
-    });
-    if (!transferResponse.ok()) throw new Error(await transferResponse.text());
-    const afterTransfer = await transferResponse.json();
-    const createdTransfer = afterTransfer.transfers.find((transfer: { recipientUsername: string; symbol: string }) => transfer.recipientUsername === user && transfer.symbol === "BTC");
-    if (!createdTransfer) throw new Error("Scheduled transfer was not created");
-    await adminPage.goto(`${baseUrl}/transfer/${createdTransfer.id}`);
+    await adminPage.goto(`${baseUrl}/send/${btc.id}`);
+    for (const hiddenText of ["Withdrawal available", "Available in", "Scheduled duration", "Processing duration", "Settlement progress"]) {
+      await expect(adminPage.getByText(hiddenText)).toHaveCount(0);
+    }
+    await adminPage.getByLabel("Recipient").fill(userBtc.displayAddress);
+    await adminPage.getByLabel("Amount").fill("0.01");
+    await adminPage.getByTestId("confirm-transfer").click();
     await expect(adminPage.getByText("Settlement progress")).toBeVisible();
     await adminContext.close();
 
     const recipientContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const recipientPage = await recipientContext.newPage();
     await signIn(recipientPage, user, pass);
-    await expect(recipientPage.getByText(/Processing .* BTC/)).toBeVisible({ timeout: 20_000 });
+    await expect(recipientPage.getByText(/Incoming processing .* BTC/)).toBeVisible({ timeout: 20_000 });
     await recipientPage.goto(`${baseUrl}/send/${btc.id}`);
     await recipientPage.getByTestId("max-send").click();
     await expect(recipientPage.locator("#amount")).toHaveValue("0");

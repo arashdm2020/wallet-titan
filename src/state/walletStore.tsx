@@ -19,8 +19,9 @@ interface WalletStoreValue {
   refresh: (options?: { forcePrices?: boolean }) => Promise<void>;
   signIn: (username: string, password: string) => Promise<void>;
   createWallet: (input: { username: string; password: string; confirmPassword: string; displayName?: string }) => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
   logout: () => Promise<void>;
-  createTransfer: (input: { assetId: string; recipientUsername: string; amount: string; settlementMode?: "immediate" | "scheduled"; durationMinutes?: number }) => Promise<{ id: string }>;
+  createTransfer: (input: { assetId: string; recipient: string; amount: string }) => Promise<{ id: string }>;
   getAsset: (id: string) => WalletAsset | undefined;
   getPortfolioAsset: (id: string) => PortfolioSnapshot["assets"][number] | undefined;
   getActivities: (assetId?: string) => WalletActivity[];
@@ -134,6 +135,14 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
     [refresh, requestJson],
   );
 
+  const updateDisplayName = useCallback(
+    async (displayName: string) => {
+      await requestJson("/api/profile", { method: "PATCH", body: JSON.stringify({ displayName }) });
+      await refresh();
+    },
+    [refresh, requestJson],
+  );
+
   const logout = useCallback(async () => {
     await requestJson("/api/auth/logout", { method: "POST", body: JSON.stringify({}) });
     setSession(null);
@@ -143,9 +152,9 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
   }, [requestJson]);
 
   const createTransfer = useCallback(
-    async (input: { assetId: string; recipientUsername: string; amount: string; settlementMode?: "immediate" | "scheduled"; durationMinutes?: number }) => {
+    async (input: { assetId: string; recipient: string; amount: string }) => {
       const result = await requestJson<{ transfer: { id: string } }>("/api/transfers", { method: "POST", body: JSON.stringify(input) });
-      await refresh();
+      void refresh().catch((nextError) => setError(nextError instanceof Error ? nextError.message : "Unable to refresh wallet data"));
       return result.transfer;
     },
     [refresh, requestJson],
@@ -156,8 +165,8 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
   const getActivities = useCallback((assetId?: string) => (assetId ? activities.filter((activity) => activity.assetId === assetId) : activities), [activities]);
 
   const value = useMemo(
-    () => ({ session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, refresh, signIn, createWallet, logout, createTransfer, getAsset, getPortfolioAsset, getActivities }),
-    [session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, refresh, signIn, createWallet, logout, createTransfer, getAsset, getPortfolioAsset, getActivities],
+    () => ({ session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, refresh, signIn, createWallet, updateDisplayName, logout, createTransfer, getAsset, getPortfolioAsset, getActivities }),
+    [session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, refresh, signIn, createWallet, updateDisplayName, logout, createTransfer, getAsset, getPortfolioAsset, getActivities],
   );
 
   return <WalletStoreContext.Provider value={value}>{children}</WalletStoreContext.Provider>;

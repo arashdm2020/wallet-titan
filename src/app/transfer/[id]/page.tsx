@@ -5,13 +5,13 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { WalletLayout } from "@/components/WalletLayout";
 import type { WalletTransfer } from "@/domain/wallet";
-import { formatCrypto, formatDateTime } from "@/utils/formatters";
+import { formatCrypto, formatDateTime, shortAddress } from "@/utils/formatters";
 
 export default function TransferPage() {
   const params = useParams<{ id: string }>();
   const [transfer, setTransfer] = useState<WalletTransfer | null>(null);
   const [error, setError] = useState("");
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const load = async () => {
@@ -34,6 +34,38 @@ export default function TransferPage() {
     };
   }, [params.id]);
 
+  useEffect(() => {
+    if (!transfer?.availableAt || transfer.status !== "processing") return;
+    const delay = Math.max(0, new Date(transfer.availableAt).getTime() - Date.now()) + 250;
+    const dueTimer = window.setTimeout(async () => {
+      const response = await fetch(`/api/transfers/${params.id}`);
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) setTransfer(data.transfer);
+    }, delay);
+    return () => window.clearTimeout(dueTimer);
+  }, [params.id, transfer?.availableAt, transfer?.status]);
+
+  const display = useMemo(() => {
+    if (!transfer || transfer.status !== "processing" || !transfer.processingStartedAt || !transfer.availableAt) {
+      return {
+        progress: transfer?.status === "completed" ? 100 : transfer?.progress ?? 0,
+        processed: 0,
+        remaining: 0,
+      };
+    }
+    const start = new Date(transfer.processingStartedAt).getTime();
+    const end = new Date(transfer.availableAt).getTime();
+    const elapsed = Math.min(Math.max(now - start, 0), Math.max(end - start, 0));
+    const duration = Math.max(end - start, 1);
+    const progress = Math.min(100, (elapsed / duration) * 100);
+    const processed = progress >= 100 ? transfer.amount : transfer.amount * (progress / 100);
+    return {
+      progress,
+      processed,
+      remaining: Math.max(0, transfer.amount - processed),
+    };
+  }, [now, transfer]);
+
   const eta = useMemo(() => {
     if (!transfer?.availableAt || transfer.status !== "processing") return "";
     const ms = Math.max(0, new Date(transfer.availableAt).getTime() - now);
@@ -52,48 +84,71 @@ export default function TransferPage() {
         <div className="mt-5 rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-blue-600">{transfer.symbol} Transfer</p>
-              <h1 className="text-2xl font-black capitalize">{transfer.status}</h1>
+              <p className="text-sm font-semibold text-blue-600">Transfer Receipt</p>
+              <h1 className="text-2xl font-black">{transfer.name}</h1>
             </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-600">Sandbox</span>
           </div>
 
           <div className="mt-6 rounded-2xl bg-slate-50 p-4">
             <p className="text-sm text-slate-500">Amount</p>
             <p className="mt-1 text-3xl font-black">{formatCrypto(transfer.amount, transfer.symbol)}</p>
-            <p className="mt-2 text-sm text-slate-500">No blockchain transaction was broadcast.</p>
           </div>
 
-          {transfer.status === "processing" ? (
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <Info label="Status" value={capitalize(transfer.status)} compact />
+            <Info label="Environment" value="Sandbox" compact />
+          </div>
+
+          {transfer.status === "processing" && transfer.settlementMode === "scheduled" ? (
             <div className="mt-5">
               <div className="flex items-center justify-between text-sm font-bold">
                 <span>Settlement progress</span>
-                <span>{transfer.progress.toFixed(1)}%</span>
+                <span>{display.progress.toFixed(2)}%</span>
               </div>
               <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, transfer.progress)}%` }} />
+                <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, display.progress)}%` }} />
               </div>
-              <Info label="Processing amount" value={formatCrypto(transfer.processingAmount, transfer.symbol)} />
-              <Info label="Remaining" value={formatCrypto(transfer.remainingAmount, transfer.symbol)} />
+              <Info label="Processed" value={formatCrypto(display.processed, transfer.symbol)} />
+              <Info label="Remaining" value={formatCrypto(display.remaining, transfer.symbol)} />
               <Info label="Estimated completion" value={eta || formatDateTime(transfer.availableAt)} />
+              <Info label="Duration" value={formatDuration(transfer.durationSeconds)} />
+            </div>
+          ) : transfer.status === "completed" ? (
+            <div data-testid="transfer-completed-result" className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+              <p className="font-bold">Transfer completed.</p>
+              <p className="mt-1 text-sm">No blockchain transaction was broadcast.</p>
             </div>
           ) : (
-            <div data-testid="simulated-transaction-result" className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-              <p className="font-bold">Simulated transaction completed.</p>
-              <p className="mt-1 text-sm">No blockchain transaction was broadcast.</p>
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+              <p className="font-bold">Transfer {transfer.status}.</p>
             </div>
           )}
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Info label="Sender" value={transfer.senderUsername} compact />
-            <Info label="Recipient" value={transfer.recipientUsername} compact />
+            <Info label="Sender" value={shortAddress(transfer.senderDisplayAddress)} compact />
+            <Info label="Recipient" value={shortAddress(transfer.recipientDisplayAddress)} compact />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
+          {transfer.completedAt ? <Info label="Completed" value={formatDateTime(transfer.completedAt)} /> : null}
           <Info label="Reason" value={transfer.processingReason} />
           <Info label="Network Information" value={`${transfer.network} · Connected · Current Block: ${transfer.networkBlockAtCreation}`} />
         </div>
       </section>
     </WalletLayout>
   );
+}
+
+function capitalize(value: string) {
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
+}
+
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes}m`;
 }
 
 function Info({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {

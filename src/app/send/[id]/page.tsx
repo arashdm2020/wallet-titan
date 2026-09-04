@@ -5,36 +5,40 @@ import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
+import { useToast } from "@/components/ToastProvider";
 import { WalletLayout } from "@/components/WalletLayout";
+import { validateRecipientAddress } from "@/domain/address";
 import { useWalletStore } from "@/state/walletStore";
-import { formatCrypto, formatDateTime } from "@/utils/formatters";
-import { getWithdrawalState } from "@/utils/withdrawal";
+import { formatCrypto, formatUsd } from "@/utils/formatters";
 
 export default function SendPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { session, getPortfolioAsset, now, loading, createTransfer } = useWalletStore();
+  const { session, getPortfolioAsset, loading, createTransfer } = useWalletStore();
   const asset = getPortfolioAsset(params.id);
   const [amount, setAmount] = useState("");
-  const [recipientUsername, setRecipientUsername] = useState("");
+  const [recipient, setRecipient] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const withdrawal = useMemo(() => getWithdrawalState(asset, now), [asset, now]);
+  const toast = useToast();
+  const recipientValidation = useMemo(() => (asset ? validateRecipientAddress(recipient, asset) : { valid: false, error: "" }), [asset, recipient]);
+  const numericAmount = Number(amount);
+  const amountValid = Number.isFinite(numericAmount) && numericAmount > 0 && numericAmount <= (asset?.availableBalance ?? asset?.balance ?? 0);
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
   if (!asset && loading) return <WalletLayout><div className="p-6">Loading send flow</div></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
 
-  const canConfirm = withdrawal.available && Number(amount) > 0 && Number(amount) <= asset.balance && recipientUsername.trim().length > 0;
+  const canConfirm = recipientValidation.valid && amountValid;
 
   const confirm = async () => {
     setBusy(true);
-    setMessage("");
     try {
-      const transfer = await createTransfer({ assetId: asset.id, recipientUsername, amount });
+      const transfer = await createTransfer({ assetId: asset.id, recipient, amount });
+      toast({ tone: "success", title: "Transfer accepted", description: "Receipt is ready." });
       router.push(`/transfer/${transfer.id}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Transfer failed");
+      const description = error instanceof Error ? error.message : "Transfer failed";
+      toast({ tone: "error", title: "Transfer failed", description });
     } finally {
       setBusy(false);
     }
@@ -49,18 +53,19 @@ export default function SendPage() {
             <AssetIcon asset={asset} />
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-black">Send {asset.symbol}</h1>
-              <p className="text-sm text-slate-500">Balance {formatCrypto(asset.balance, asset.symbol)}</p>
+              <p className="text-sm text-slate-500">Available {formatCrypto(asset.availableBalance ?? asset.balance, asset.symbol)}</p>
             </div>
           </div>
 
-          <label className="mt-8 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient username</label>
+          <label className="mt-8 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient</label>
           <input
             id="address"
-            value={recipientUsername}
-            onChange={(event) => setRecipientUsername(event.target.value)}
-            placeholder="Existing simulator user"
+            value={recipient}
+            onChange={(event) => setRecipient(event.target.value)}
+            placeholder={asset.symbol === "ETH" ? "0x..." : asset.symbol === "BTC" ? "bc1..." : "T..."}
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-blue-500 focus:bg-white"
           />
+          {recipient && !recipientValidation.valid ? <p className="mt-2 text-xs font-semibold text-rose-500">{recipientValidation.error}</p> : null}
 
           <label className="mt-5 block text-sm font-semibold text-slate-600" htmlFor="amount">Amount</label>
           <div className="mt-2 flex gap-2">
@@ -72,33 +77,31 @@ export default function SendPage() {
               placeholder={`0.00 ${asset.symbol}`}
               className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-blue-500 focus:bg-white"
             />
-            <button type="button" data-testid="max-send" onClick={() => setAmount(String(asset.balance))} className="w-20 rounded-2xl bg-slate-900 text-sm font-bold text-white">MAX</button>
+            <button type="button" data-testid="max-send" onClick={() => setAmount(String(asset.availableBalance ?? asset.balance))} className="w-20 rounded-2xl bg-slate-900 text-sm font-bold text-white">MAX</button>
           </div>
-          <p className="mt-2 text-xs font-semibold text-slate-500">MAX uses spendable balance only. Processing incoming funds are locked.</p>
+          {amount && !amountValid ? <p className="mt-2 text-xs font-semibold text-rose-500">Enter an amount up to the available balance.</p> : null}
 
-          <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-            <p className="font-bold">{withdrawal.label}</p>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
-              {withdrawal.available ? "Completing this flow creates only a simulated result." : `Withdrawal available ${formatDateTime(asset.withdrawalAvailableAt)}`}
-            </p>
-            {withdrawal.countdown ? <p data-testid="withdrawal-countdown" className="mt-1 text-sm font-bold text-blue-600">Available in {withdrawal.countdown}</p> : null}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-500">Available</p>
+              <p className="mt-1 font-bold">{formatCrypto(asset.availableBalance ?? asset.balance, asset.symbol)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-500">Network fee</p>
+              <p className="mt-1 font-bold">{formatUsd(0)}</p>
+            </div>
           </div>
 
           <button
             disabled={!canConfirm}
             onClick={confirm}
-            data-testid="confirm-simulated-send"
+            data-testid="confirm-transfer"
             className="mt-6 h-14 w-full rounded-2xl bg-blue-600 text-base font-bold text-white shadow-lg shadow-blue-600/20 disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
           >
-            {busy ? "Creating Transfer" : "Confirm Simulated Transfer"}
+            {busy ? "Creating Transfer" : "Confirm Transfer"}
           </button>
         </div>
 
-        {message ? <div className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">{message}</div> : null}
-
-        <p className="mt-5 text-sm leading-6 text-slate-500">
-          This screen never signs transactions, connects to wallet credentials, or submits RPC requests.
-        </p>
       </section>
     </WalletLayout>
   );

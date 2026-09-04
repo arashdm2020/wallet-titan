@@ -1,6 +1,6 @@
-# Wallet Simulator
+# Titan Wallet
 
-Mobile-first cryptocurrency wallet simulator built with Next.js, TypeScript, Tailwind CSS, SQLite, and PWA support.
+Mobile-first sandbox cryptocurrency wallet built with Next.js, TypeScript, Tailwind CSS, SQLite, and PWA support.
 
 This is not a real cryptocurrency wallet. It does not request seed phrases, mnemonics, private keys, imported wallets, signatures, or blockchain transaction broadcasts.
 

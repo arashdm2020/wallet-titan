@@ -1,8 +1,8 @@
-export type ActivityStatus = "completed" | "pending" | "failed" | "scheduled";
+export type ActivityStatus = "completed" | "pending" | "processing" | "failed" | "cancelled";
 export type ActivityType = "send" | "receive" | "swap" | "adjustment";
 export type UserRole = "ADMIN" | "USER";
 export type SettlementMode = "immediate" | "scheduled";
-export type TransferStatus = "completed" | "processing" | "failed";
+export type TransferStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
 
 export interface WalletUser {
   id: string;
@@ -19,9 +19,19 @@ export interface WalletAsset {
   balance: number;
   balanceAtoms?: string;
   balanceDisplay?: string;
+  availableBalance?: number;
+  availableBalanceAtoms?: string;
+  pendingOutgoing?: number;
+  pendingOutgoingAtoms?: string;
   incomingAmount?: number;
   processingAmount?: number;
+  processingIncoming?: number;
+  processingIncomingAtoms?: string;
+  pendingIncomingTotal?: number;
+  pendingIncomingAtoms?: string;
   remainingIncomingAmount?: number;
+  incomingRemaining?: number;
+  incomingRemainingAtoms?: string;
   displayAddress: string;
   enabled: boolean;
   withdrawalEnabled: boolean;
@@ -39,6 +49,11 @@ export interface WalletActivity {
   displayAddress?: string;
   txHash?: string;
   progress?: number;
+  pendingAmount?: number;
+  processingAmount?: number;
+  remainingAmount?: number;
+  availableAt?: string;
+  settlementMode?: SettlementMode;
 }
 
 export interface WalletTransfer {
@@ -60,11 +75,13 @@ export interface WalletTransfer {
   processingStartedAt?: string;
   availableAt?: string;
   completedAt?: string;
-  durationMinutes: number;
+  durationSeconds: number;
   processingReason: string;
   networkBlockAtCreation: number;
   senderUsername: string;
   recipientUsername: string;
+  senderDisplayAddress: string;
+  recipientDisplayAddress: string;
   processingAmount: number;
   processingAtoms: string;
   remainingAmount: number;

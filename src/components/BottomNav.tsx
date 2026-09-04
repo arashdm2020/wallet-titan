@@ -19,7 +19,7 @@ export function BottomNav() {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
             <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs font-semibold ${active ? "text-blue-600" : "text-slate-500"}`}>
-              <span className={`grid h-8 w-8 place-items-center rounded-full text-lg ${active ? "bg-blue-50" : ""}`}>{item.icon}</span>
+              <span className={`grid h-[37px] w-[37px] place-items-center rounded-full text-[21px] ${active ? "bg-blue-50" : ""}`}>{item.icon}</span>
               {item.label}
             </Link>
           );

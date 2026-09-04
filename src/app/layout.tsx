@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wallet",
-  description: "A mobile-first cryptocurrency wallet simulator with live USD prices.",
+  title: "Titan Wallet",
+  description: "A mobile-first sandbox cryptocurrency wallet with live USD prices.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "Wallet",
+    title: "Titan Wallet",
     statusBarStyle: "default",
   },
 };

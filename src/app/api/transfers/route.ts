@@ -21,15 +21,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const transfer = createTransfer({
       senderWalletId: session.walletId,
-      recipientUsername: String(body.recipientUsername || ""),
+      recipient: String(body.recipient || body.recipientUsername || ""),
       assetId: String(body.assetId || ""),
       amount: String(body.amount || ""),
-      settlementMode: body.settlementMode,
-      durationMinutes: body.durationMinutes ? Number(body.durationMinutes) : undefined,
     });
     return NextResponse.json({ transfer });
   } catch (error) {
     return apiError(error);
   }
 }
-

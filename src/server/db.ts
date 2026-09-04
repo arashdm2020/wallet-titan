@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
+import { generateWalletAddress } from "@/domain/address";
 import { hashPassword } from "@/server/auth";
 import { parseAmountToAtoms } from "@/server/money";
 
@@ -78,7 +79,9 @@ export function migrate() {
       scheduled_enabled INTEGER NOT NULL,
       default_settlement_mode TEXT NOT NULL,
       default_duration_minutes INTEGER NOT NULL,
+      default_duration_seconds INTEGER,
       max_duration_minutes INTEGER NOT NULL,
+      max_duration_seconds INTEGER,
       processing_reason TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS transfers (
@@ -88,7 +91,7 @@ export function migrate() {
       asset_id TEXT NOT NULL REFERENCES asset_definitions(id),
       amount_atoms TEXT NOT NULL,
       settlement_mode TEXT NOT NULL CHECK(settlement_mode IN ('immediate','scheduled')),
-      status TEXT NOT NULL CHECK(status IN ('completed','processing','failed')),
+      status TEXT NOT NULL CHECK(status IN ('pending','processing','completed','failed','cancelled')),
       simulation INTEGER NOT NULL DEFAULT 1,
       transfer_reference TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
@@ -96,6 +99,7 @@ export function migrate() {
       available_at TEXT,
       completed_at TEXT,
       duration_minutes INTEGER NOT NULL DEFAULT 0,
+      duration_seconds INTEGER,
       processing_reason TEXT NOT NULL,
       network_block_at_creation INTEGER NOT NULL
     );
@@ -108,10 +112,36 @@ export function migrate() {
       amount_atoms TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS wallet_asset_addresses (
+      wallet_id TEXT NOT NULL REFERENCES wallets(id),
+      asset_id TEXT NOT NULL REFERENCES asset_definitions(id),
+      display_address TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY(wallet_id, asset_id),
+      UNIQUE(asset_id, display_address)
+    );
     CREATE INDEX IF NOT EXISTS idx_transfers_sender ON transfers(sender_wallet_id);
     CREATE INDEX IF NOT EXISTS idx_transfers_recipient ON transfers(recipient_wallet_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_credit_once ON ledger_entries(transfer_id, wallet_id, type) WHERE type = 'credit';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_release_once ON ledger_entries(transfer_id, wallet_id, type) WHERE type = 'release';
+  `);
+  addColumnIfMissing("settlement_settings", "default_duration_seconds", "INTEGER");
+  addColumnIfMissing("settlement_settings", "max_duration_seconds", "INTEGER");
+  addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
+  db.exec(`
+    UPDATE settlement_settings
+    SET default_duration_seconds = COALESCE(default_duration_seconds, default_duration_minutes * 60),
+        max_duration_seconds = COALESCE(max_duration_seconds, max_duration_minutes * 60);
+    UPDATE transfers
+    SET duration_seconds = COALESCE(duration_seconds, duration_minutes * 60);
   `);
   db.exec("UPDATE transfers SET transfer_reference = REPLACE(transfer_reference, 'D' || 'EMO-', 'SIM-') WHERE transfer_reference LIKE 'D' || 'EMO-%';");
+  db.exec("UPDATE transfers SET transfer_reference = REPLACE(transfer_reference, 'SIM-', 'TRF-') WHERE transfer_reference LIKE 'SIM-%';");
+}
+
+function addColumnIfMissing(table: string, column: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+  if (!columns.some((item) => item.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 function id(prefix: string) {
@@ -144,10 +174,10 @@ export function seedDatabase() {
     }
 
     const assets = [
-      ["asset_trx", "TRX", "TRON", "TRON", "TAdminTrxSimulatorDisplayOnly9xuWb", 1, 1, "2026-09-05T18:00:00+03:30", "/assets/crypto/trx.svg", "250000"],
-      ["asset_btc", "BTC", "Bitcoin", "Bitcoin", "bc1qadminsim9xs0simulator8displayonly4wallet", 1, 1, null, "/assets/crypto/btc.svg", "10"],
-      ["asset_eth", "ETH", "Ethereum", "Ethereum", "0xAdminSim85F4293Eef9d7C7096cAB4f6F7Display", 1, 1, null, "/assets/crypto/eth.svg", "250"],
-      ["asset_usdt", "USDT", "Tether USD", "TRON", "TAdminUsdtSimulatorAddressOnlyNoRealFunds8s9Yq", 1, 1, null, "/assets/crypto/usdt.svg", "1000000"],
+      ["asset_trx", "TRX", "TRON", "TRON", "TAbC9vT4pQXx7sL2mN8rY5kZ3wH6jP", 1, 1, "2026-09-05T18:00:00+03:30", "/assets/crypto/trx.svg", "250000"],
+      ["asset_btc", "BTC", "Bitcoin", "Bitcoin", "bc1q84c92f71a0b3d56e91c4872fd3a6b8c22e9a", 1, 1, null, "/assets/crypto/btc.svg", "10"],
+      ["asset_eth", "ETH", "Ethereum", "Ethereum", "0x3A4f2cB89dE912345678901234567890abcdef12", 1, 1, null, "/assets/crypto/eth.svg", "250"],
+      ["asset_usdt", "USDT", "Tether USD", "TRON", "TQ9qL7rM2xV5sN8pY3kZ6wH4jC1bA", 1, 1, null, "/assets/crypto/usdt.svg", "1000000"],
     ];
 
     const insertAsset = db.prepare("INSERT OR IGNORE INTO asset_definitions (id, symbol, name, network, display_address, enabled, withdrawal_enabled, withdrawal_available_at, icon_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -157,16 +187,23 @@ export function seedDatabase() {
     const repairAsset = db.prepare("UPDATE asset_definitions SET icon_path = ?, display_address = CASE WHEN display_address LIKE '%' || 'De' || 'mo' || '%' OR display_address LIKE '%' || 'de' || 'mo' || '%' THEN ? ELSE display_address END WHERE id = ?");
     for (const asset of assets) repairAsset.run(asset[8], asset[4], asset[0]);
 
-    const wallets = db.prepare("SELECT id, wallet_type FROM wallets").all() as unknown as { id: string; wallet_type: "ADMIN" | "USER" }[];
+    const wallets = db
+      .prepare(
+        `SELECT wallets.id, wallets.wallet_type, users.username
+         FROM wallets JOIN users ON users.id = wallets.user_id`,
+      )
+      .all() as unknown as { id: string; wallet_type: "ADMIN" | "USER"; username: string }[];
     const insertMissingBalance = db.prepare("INSERT OR IGNORE INTO wallet_balances (wallet_id, asset_id, amount_atoms) VALUES (?, ?, ?)");
+    const insertMissingAddress = db.prepare("INSERT OR IGNORE INTO wallet_asset_addresses (wallet_id, asset_id, display_address, created_at) VALUES (?, ?, ?, ?)");
     for (const wallet of wallets) {
       for (const asset of assets) {
         const seedAmount = wallet.wallet_type === "ADMIN" ? parseAmountToAtoms(String(asset[9]), String(asset[1])).toString() : "0";
         insertMissingBalance.run(wallet.id, asset[0], seedAmount);
+        insertMissingAddress.run(wallet.id, asset[0], generateWalletAddress(String(asset[1]), String(asset[3]), wallet.id, wallet.username), now);
       }
     }
 
-    db.prepare("INSERT OR IGNORE INTO settlement_settings (id, immediate_enabled, scheduled_enabled, default_settlement_mode, default_duration_minutes, max_duration_minutes, processing_reason) VALUES (1, 1, 1, 'scheduled', 480, 720, 'Full ledger verification from block 0')").run();
+    db.prepare("INSERT OR IGNORE INTO settlement_settings (id, immediate_enabled, scheduled_enabled, default_settlement_mode, default_duration_minutes, default_duration_seconds, max_duration_minutes, max_duration_seconds, processing_reason) VALUES (1, 1, 1, 'scheduled', 480, 28800, 720, 43200, 'Full ledger verification from block 0')").run();
   });
 }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { PhoneShell } from "@/components/PhoneShell";
+import { useToast } from "@/components/ToastProvider";
 import type { WalletTransfer } from "@/domain/wallet";
 import { formatCrypto, formatDateTime } from "@/utils/formatters";
 
@@ -15,7 +16,9 @@ interface AdminSnapshot {
     scheduled_enabled: number;
     default_settlement_mode: "immediate" | "scheduled";
     default_duration_minutes: number;
+    default_duration_seconds?: number;
     max_duration_minutes: number;
+    max_duration_seconds?: number;
     processing_reason: string;
   };
   transfers: WalletTransfer[];
@@ -25,6 +28,7 @@ export default function AdminPage() {
   const [snapshot, setSnapshot] = useState<AdminSnapshot | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const toast = useToast();
 
   const load = async () => {
     const response = await fetch("/api/admin/snapshot");
@@ -48,10 +52,12 @@ export default function AdminPage() {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       setError(data.error || "Admin action failed");
+      toast({ tone: "error", title: "Admin action failed", description: data.error || "Unable to save changes" });
       return;
     }
     setSnapshot(data);
     setMessage("Saved.");
+    toast({ tone: "success", title: "Saved", description: "Admin changes were applied." });
   };
 
   useEffect(() => {
@@ -80,7 +86,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">Admin</h1>
-            <p className="mt-1 text-sm text-slate-500">Development-only simulator controls</p>
+            <p className="mt-1 text-sm text-slate-500">Development-only controls</p>
           </div>
           <Link href="/" className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white">Wallet</Link>
         </div>
@@ -195,16 +201,22 @@ function CreateUserForm({ onSubmit }: { onSubmit: (body: Record<string, unknown>
 
 function SettingsForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
   const [defaultMode, setDefaultMode] = useState(snapshot.settings.default_settlement_mode);
-  const [duration, setDuration] = useState(String(snapshot.settings.default_duration_minutes));
-  const [maxDuration, setMaxDuration] = useState(String(snapshot.settings.max_duration_minutes));
+  const defaultSeconds = snapshot.settings.default_duration_seconds ?? snapshot.settings.default_duration_minutes * 60;
+  const maxSeconds = snapshot.settings.max_duration_seconds ?? snapshot.settings.max_duration_minutes * 60;
+  const [durationHours, setDurationHours] = useState(String(Math.floor(defaultSeconds / 3600)));
+  const [durationMinutes, setDurationMinutes] = useState(String(Math.floor((defaultSeconds % 3600) / 60)));
+  const [maxDurationHours, setMaxDurationHours] = useState(String(Math.floor(maxSeconds / 3600)));
+  const [maxDurationMinutes, setMaxDurationMinutes] = useState(String(Math.floor((maxSeconds % 3600) / 60)));
   const [reason, setReason] = useState(snapshot.settings.processing_reason);
   const [immediateEnabled, setImmediateEnabled] = useState(Boolean(snapshot.settings.immediate_enabled));
   const [scheduledEnabled, setScheduledEnabled] = useState(Boolean(snapshot.settings.scheduled_enabled));
+  const defaultDurationSeconds = Math.max(0, Number(durationHours || 0) * 3600 + Number(durationMinutes || 0) * 60);
+  const maxDurationSeconds = Math.max(0, Number(maxDurationHours || 0) * 3600 + Number(maxDurationMinutes || 0) * 60);
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit({ action: "updateSettings", defaultMode, defaultDurationMinutes: Number(duration), maxDurationMinutes: Number(maxDuration), processingReason: reason, immediateEnabled, scheduledEnabled });
+        onSubmit({ action: "updateSettings", defaultMode, defaultDurationSeconds, maxDurationSeconds, processingReason: reason, immediateEnabled, scheduledEnabled });
       }}
       className="mt-5 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100"
     >
@@ -214,8 +226,16 @@ function SettingsForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmi
         <option value="scheduled">Scheduled</option>
         <option value="immediate">Immediate</option>
       </select>
-      <Field label="Default duration minutes" value={duration} onChange={setDuration} inputMode="numeric" />
-      <Field label="Maximum duration minutes" value={maxDuration} onChange={setMaxDuration} inputMode="numeric" />
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Field label="Hours" value={durationHours} onChange={setDurationHours} inputMode="numeric" />
+        <Field label="Minutes" value={durationMinutes} onChange={setDurationMinutes} inputMode="numeric" />
+      </div>
+      <p className="mt-2 text-xs font-semibold text-slate-500">Scheduled duration: {formatDuration(defaultDurationSeconds)}</p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Field label="Max hours" value={maxDurationHours} onChange={setMaxDurationHours} inputMode="numeric" />
+        <Field label="Max minutes" value={maxDurationMinutes} onChange={setMaxDurationMinutes} inputMode="numeric" />
+      </div>
+      <p className="mt-2 text-xs font-semibold text-slate-500">Maximum duration: {formatDuration(maxDurationSeconds)}</p>
       <Field label="Processing reason" value={reason} onChange={setReason} />
       <Toggle label="Immediate enabled" checked={immediateEnabled} onChange={setImmediateEnabled} />
       <Toggle label="Scheduled enabled" checked={scheduledEnabled} onChange={setScheduledEnabled} />
@@ -260,31 +280,26 @@ function BalanceEditor({ walletId, asset, amount, onSubmit }: { walletId: string
 
 function TransferForm({ snapshot, onSubmit }: { snapshot: AdminSnapshot; onSubmit: (body: Record<string, unknown>) => Promise<void> }) {
   const admin = useMemo(() => snapshot.users.find((user) => user.role === "ADMIN"), [snapshot.users]);
-  const [recipientUsername, setRecipientUsername] = useState("");
+  const [recipient, setRecipient] = useState("");
   const [assetId, setAssetId] = useState(snapshot.assets[0]?.id || "");
   const [amount, setAmount] = useState("");
-  const [mode, setMode] = useState<"immediate" | "scheduled">(snapshot.settings.default_settlement_mode);
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit({ action: "createTransfer", senderWalletId: admin?.walletId, recipientUsername, assetId, amount, settlementMode: mode });
+        onSubmit({ action: "createTransfer", senderWalletId: admin?.walletId, recipient, assetId, amount });
       }}
       className="mt-5 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100"
     >
       <h2 className="font-bold">Send from ADMIN wallet</h2>
-      <Field label="Recipient username" value={recipientUsername} onChange={setRecipientUsername} />
+      <Field label="Recipient username or address" value={recipient} onChange={setRecipient} />
       <label className="mt-4 block text-sm font-semibold text-slate-600">Asset</label>
       <select value={assetId} onChange={(event) => setAssetId(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
         {snapshot.assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name} ({asset.symbol})</option>)}
       </select>
       <Field label="Amount" value={amount} onChange={setAmount} inputMode="decimal" />
-      <label className="mt-4 block text-sm font-semibold text-slate-600">Settlement mode</label>
-      <select value={mode} onChange={(event) => setMode(event.target.value as "immediate" | "scheduled")} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <option value="scheduled">Scheduled</option>
-        <option value="immediate">Immediate</option>
-      </select>
-      <button className="mt-5 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white">Create simulated transfer</button>
+      <p className="mt-3 text-xs font-semibold text-slate-500">Uses current settlement mode: {snapshot.settings.default_settlement_mode}</p>
+      <button className="mt-5 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white">Create transfer</button>
     </form>
   );
 }
@@ -299,11 +314,16 @@ function TransfersPanel({ transfers }: { transfers: WalletTransfer[] }) {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold">{transfer.senderUsername} to {transfer.recipientUsername}</p>
-                <p className="text-sm text-slate-500">{formatCrypto(transfer.amount, transfer.symbol)} · {transfer.status}</p>
+                <p className="text-sm text-slate-500">{formatCrypto(transfer.amount, transfer.symbol)} · {transfer.settlementMode} · {transfer.status}</p>
               </div>
               <p className="text-sm font-bold text-blue-600">{transfer.progress.toFixed(1)}%</p>
             </div>
-            {transfer.availableAt ? <p className="mt-1 text-xs text-slate-400">Available {formatDateTime(transfer.availableAt)}</p> : null}
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
+              <p>Started {formatDateTime(transfer.createdAt)}</p>
+              <p>Completion {transfer.availableAt ? formatDateTime(transfer.availableAt) : formatDateTime(transfer.completedAt)}</p>
+              <p>Processed {formatCrypto(transfer.processingAmount, transfer.symbol)}</p>
+              <p>Remaining {formatCrypto(transfer.remainingAmount, transfer.symbol)}</p>
+            </div>
           </Link>
         ))}
         {!transfers.length ? <p className="py-4 text-sm text-slate-500">No transfers yet.</p> : null}
@@ -328,4 +348,12 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       <input className="h-6 w-11" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     </label>
   );
+}
+
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes}m`;
 }

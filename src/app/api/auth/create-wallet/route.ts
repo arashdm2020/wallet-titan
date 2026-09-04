@@ -9,8 +9,8 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const password = String(body.password || "");
-    if (password !== String(body.confirmPassword || "")) throw new Error("Passwords do not match");
+    const password = String(body.password || "").trim();
+    if (password !== String(body.confirmPassword || "").trim()) throw new Error("Passwords do not match");
     const user = createUserWallet({
       username: String(body.username || ""),
       password,

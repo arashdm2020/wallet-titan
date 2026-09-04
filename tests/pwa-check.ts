@@ -37,7 +37,7 @@ async function main() {
   const manifestResponse = await page.request.get(`${baseUrl}/manifest.webmanifest`);
   if (!manifestResponse.ok()) throw new Error("Manifest did not load");
   const manifest = await manifestResponse.json();
-  if (manifest.name !== "Wallet" || manifest.short_name !== "Wallet" || manifest.start_url !== "/" || manifest.scope !== "/" || manifest.display !== "standalone") {
+  if (manifest.name !== "Titan Wallet" || manifest.short_name !== "Titan" || manifest.start_url !== "/" || manifest.scope !== "/" || manifest.display !== "standalone") {
     throw new Error("Manifest core installability fields are invalid");
   }
   for (const icon of ["/icons/icon-192.png", "/icons/icon-512.png", "/icons/maskable-192.png", "/icons/maskable-512.png", "/icons/apple-touch-icon.png"]) {
@@ -57,7 +57,7 @@ async function main() {
 
   const android = await createSignedInPage();
   await android.page.goto(`${baseUrl}/settings`);
-  await expect(android.page.getByText("About")).toBeVisible();
+  await expect(android.page.getByText("Profile", { exact: true })).toBeVisible();
   await android.page.waitForTimeout(500);
   await android.page.evaluate(() => {
     const event = new Event("beforeinstallprompt") as Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted"; platform: string }> };
@@ -74,7 +74,7 @@ async function main() {
     userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
   });
   await ios.page.goto(`${baseUrl}/settings`);
-  await expect(ios.page.getByText("About")).toBeVisible();
+  await expect(ios.page.getByText("Profile", { exact: true })).toBeVisible();
   await expect(ios.page.getByRole("button", { name: "Install" })).toBeVisible({ timeout: 10_000 });
   await ios.page.getByRole("button", { name: "Install" }).click();
   await expect(ios.page.getByText("Tap the Share button in Safari")).toBeVisible();
@@ -82,7 +82,7 @@ async function main() {
 
   const standalone = await createSignedInPage({ standalone: true });
   await standalone.page.goto(`${baseUrl}/settings`);
-  await expect(standalone.page.getByText("About")).toBeVisible();
+  await expect(standalone.page.getByText("Profile", { exact: true })).toBeVisible();
   await expect(standalone.page.getByRole("button", { name: "Install" })).toHaveCount(0);
   await standalone.browser.close();
 }

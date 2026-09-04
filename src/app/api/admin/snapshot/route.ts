@@ -43,8 +43,10 @@ export async function POST(request: NextRequest) {
     } else if (body.action === "updateSettings") {
       updateSettlementSettings({
         defaultMode: String(body.defaultMode || "scheduled"),
-        defaultDurationMinutes: Number(body.defaultDurationMinutes || 480),
-        maxDurationMinutes: Number(body.maxDurationMinutes || 720),
+        defaultDurationSeconds: body.defaultDurationSeconds ? Number(body.defaultDurationSeconds) : undefined,
+        defaultDurationMinutes: body.defaultDurationMinutes ? Number(body.defaultDurationMinutes) : undefined,
+        maxDurationSeconds: body.maxDurationSeconds ? Number(body.maxDurationSeconds) : undefined,
+        maxDurationMinutes: body.maxDurationMinutes ? Number(body.maxDurationMinutes) : undefined,
         processingReason: String(body.processingReason || "Full ledger verification from block 0"),
         immediateEnabled: Boolean(body.immediateEnabled),
         scheduledEnabled: Boolean(body.scheduledEnabled),
@@ -52,11 +54,9 @@ export async function POST(request: NextRequest) {
     } else if (body.action === "createTransfer") {
       createTransfer({
         senderWalletId: String(body.senderWalletId || session.walletId),
-        recipientUsername: String(body.recipientUsername || ""),
+        recipient: String(body.recipient || body.recipientUsername || ""),
         assetId: String(body.assetId || ""),
         amount: String(body.amount || ""),
-        settlementMode: body.settlementMode,
-        durationMinutes: body.durationMinutes ? Number(body.durationMinutes) : undefined,
       });
     } else {
       throw new Error("Unknown admin action");

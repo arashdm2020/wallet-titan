@@ -1,4 +1,5 @@
 import { hashPassword, verifyPassword } from "@/server/auth";
+import { generateWalletAddress } from "@/domain/address";
 import { getDb, id, seedDatabase, transaction, type Role } from "@/server/db";
 import { atomsToDecimalString, atomsToNumber, parseAmountToAtoms, settledAtoms } from "@/server/money";
 import type { AuthSession } from "@/server/session";
@@ -45,7 +46,7 @@ interface TransferRow {
   asset_id: string;
   amount_atoms: string;
   settlement_mode: "immediate" | "scheduled";
-  status: "completed" | "processing" | "failed";
+  status: "pending" | "processing" | "completed" | "failed" | "cancelled";
   simulation: number;
   transfer_reference: string;
   created_at: string;
@@ -53,6 +54,7 @@ interface TransferRow {
   available_at: string | null;
   completed_at: string | null;
   duration_minutes: number;
+  duration_seconds: number | null;
   processing_reason: string;
   network_block_at_creation: number;
   symbol: string;
@@ -60,6 +62,8 @@ interface TransferRow {
   network: string;
   sender_username: string;
   recipient_username: string;
+  sender_display_address: string;
+  recipient_display_address: string;
 }
 
 export function authenticate(username: string, password: string) {
@@ -93,7 +97,10 @@ export function createUserWallet(input: { username: string; password: string; di
 
     const assets = getDb().prepare("SELECT id FROM asset_definitions").all() as { id: string }[];
     const insertBalance = getDb().prepare("INSERT INTO wallet_balances (wallet_id, asset_id, amount_atoms) VALUES (?, ?, '0')");
+    const insertAddress = getDb().prepare("INSERT INTO wallet_asset_addresses (wallet_id, asset_id, display_address, created_at) VALUES (?, ?, ?, ?)");
+    const assetDefinitions = getDb().prepare("SELECT id, symbol, network FROM asset_definitions").all() as unknown as { id: string; symbol: string; network: string }[];
     for (const asset of assets) insertBalance.run(walletId, asset.id);
+    for (const asset of assetDefinitions) insertAddress.run(walletId, asset.id, generateWalletAddress(asset.symbol, asset.network, walletId, username), now);
 
     return { id: userId, username, displayName: input.displayName?.trim() || username, role, enabled: true, walletId, walletType: role };
   });
@@ -106,16 +113,19 @@ export function finalizeDueTransfers(now = new Date()) {
       .prepare("SELECT id, recipient_wallet_id, asset_id, amount_atoms FROM transfers WHERE settlement_mode = 'scheduled' AND status = 'processing' AND available_at <= ?")
       .all(now.toISOString()) as Pick<TransferRow, "id" | "recipient_wallet_id" | "asset_id" | "amount_atoms">[];
     for (const transferRow of due) {
-      const current = getDb().prepare("SELECT status FROM transfers WHERE id = ?").get(transferRow.id) as { status: string } | undefined;
-      if (!current || current.status !== "processing") continue;
+      getDb()
+        .prepare("UPDATE transfers SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'processing'")
+        .run(now.toISOString(), transferRow.id);
+      const changed = getDb().prepare("SELECT changes() AS changed").get() as { changed: number };
+      if (changed.changed !== 1) continue;
       getDb()
         .prepare("UPDATE wallet_balances SET amount_atoms = CAST(CAST(amount_atoms AS INTEGER) + CAST(? AS INTEGER) AS TEXT) WHERE wallet_id = ? AND asset_id = ?")
         .run(transferRow.amount_atoms, transferRow.recipient_wallet_id, transferRow.asset_id);
       getDb()
-        .prepare("UPDATE transfers SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'processing'")
-        .run(now.toISOString(), transferRow.id);
-      getDb()
         .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'credit', ?, ?)")
+        .run(id("ledger"), transferRow.recipient_wallet_id, transferRow.asset_id, transferRow.id, transferRow.amount_atoms, now.toISOString());
+      getDb()
+        .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'release', ?, ?)")
         .run(id("ledger"), transferRow.recipient_wallet_id, transferRow.asset_id, transferRow.id, transferRow.amount_atoms, now.toISOString());
     }
     return due.length;
@@ -126,9 +136,13 @@ export function getWalletSnapshot(session: AuthSession, now = new Date()) {
   finalizeDueTransfers(now);
   const assets = getDb()
     .prepare(
-      `SELECT asset_definitions.*, wallet_balances.amount_atoms
+      `SELECT asset_definitions.id, asset_definitions.symbol, asset_definitions.name, asset_definitions.network,
+              COALESCE(wallet_asset_addresses.display_address, asset_definitions.display_address) AS display_address,
+              asset_definitions.enabled, asset_definitions.withdrawal_enabled, asset_definitions.withdrawal_available_at,
+              asset_definitions.icon_path, wallet_balances.amount_atoms
        FROM asset_definitions
        JOIN wallet_balances ON wallet_balances.asset_id = asset_definitions.id AND wallet_balances.wallet_id = ?
+       LEFT JOIN wallet_asset_addresses ON wallet_asset_addresses.asset_id = asset_definitions.id AND wallet_asset_addresses.wallet_id = wallet_balances.wallet_id
        ORDER BY CASE symbol WHEN 'TRX' THEN 1 WHEN 'BTC' THEN 2 WHEN 'ETH' THEN 3 WHEN 'USDT' THEN 4 ELSE 5 END`,
     )
     .all(session.walletId) as unknown as AssetRow[];
@@ -147,6 +161,13 @@ export function getWalletSnapshot(session: AuthSession, now = new Date()) {
           }),
           { totalAtoms: 0n, processingAtoms: 0n },
         );
+      const pendingOutgoingAtoms = transfers
+        .filter((transferItem) => transferItem.senderWalletId === session.walletId && transferItem.assetId === asset.id && transferItem.status === "processing")
+        .reduce((total, transferItem) => total + BigInt(transferItem.amountAtoms), 0n);
+      const availableAtoms = asset.amount_atoms || "0";
+      const processingIncomingAtoms = incoming.processingAtoms;
+      const pendingIncomingAtoms = incoming.totalAtoms;
+      const incomingRemainingAtoms = incoming.totalAtoms - incoming.processingAtoms;
       return {
         id: asset.id,
         symbol: asset.symbol,
@@ -157,12 +178,22 @@ export function getWalletSnapshot(session: AuthSession, now = new Date()) {
         withdrawalEnabled: Boolean(asset.withdrawal_enabled),
         withdrawalAvailableAt: asset.withdrawal_available_at || undefined,
         iconPath: asset.icon_path || undefined,
-        balance: atomsToNumber(asset.amount_atoms || "0", asset.symbol),
-        balanceAtoms: asset.amount_atoms || "0",
-        balanceDisplay: atomsToDecimalString(asset.amount_atoms || "0", asset.symbol),
-        incomingAmount: atomsToNumber(incoming.totalAtoms, asset.symbol),
-        processingAmount: atomsToNumber(incoming.processingAtoms, asset.symbol),
-        remainingIncomingAmount: atomsToNumber(incoming.totalAtoms - incoming.processingAtoms, asset.symbol),
+        balance: atomsToNumber(availableAtoms, asset.symbol),
+        balanceAtoms: availableAtoms,
+        balanceDisplay: atomsToDecimalString(availableAtoms, asset.symbol),
+        availableBalance: atomsToNumber(availableAtoms, asset.symbol),
+        availableBalanceAtoms: availableAtoms,
+        pendingOutgoing: atomsToNumber(pendingOutgoingAtoms, asset.symbol),
+        pendingOutgoingAtoms: pendingOutgoingAtoms.toString(),
+        incomingAmount: atomsToNumber(pendingIncomingAtoms, asset.symbol),
+        processingAmount: atomsToNumber(processingIncomingAtoms, asset.symbol),
+        processingIncoming: atomsToNumber(processingIncomingAtoms, asset.symbol),
+        processingIncomingAtoms: processingIncomingAtoms.toString(),
+        pendingIncomingTotal: atomsToNumber(pendingIncomingAtoms, asset.symbol),
+        pendingIncomingAtoms: pendingIncomingAtoms.toString(),
+        remainingIncomingAmount: atomsToNumber(incomingRemainingAtoms, asset.symbol),
+        incomingRemaining: atomsToNumber(incomingRemainingAtoms, asset.symbol),
+        incomingRemainingAtoms: incomingRemainingAtoms.toString(),
       };
     }),
     transfers,
@@ -228,16 +259,20 @@ export function setWalletBalance(walletId: string, assetId: string, amount: stri
   getDb().prepare("UPDATE wallet_balances SET amount_atoms = ? WHERE wallet_id = ? AND asset_id = ?").run(atoms.toString(), walletId, assetId);
 }
 
-export function updateSettlementSettings(input: { defaultMode: string; defaultDurationMinutes: number; maxDurationMinutes: number; processingReason: string; immediateEnabled: boolean; scheduledEnabled: boolean }) {
+export function updateSettlementSettings(input: { defaultMode: string; defaultDurationMinutes?: number; defaultDurationSeconds?: number; maxDurationMinutes?: number; maxDurationSeconds?: number; processingReason: string; immediateEnabled: boolean; scheduledEnabled: boolean }) {
   if (!["immediate", "scheduled"].includes(input.defaultMode)) throw new Error("Invalid settlement mode");
-  if (input.defaultDurationMinutes < 1 || input.maxDurationMinutes < input.defaultDurationMinutes) throw new Error("Invalid duration settings");
+  const defaultDurationSeconds = Math.trunc(input.defaultDurationSeconds ?? (input.defaultDurationMinutes ?? 480) * 60);
+  const maxDurationSeconds = Math.trunc(input.maxDurationSeconds ?? (input.maxDurationMinutes ?? 720) * 60);
+  if (defaultDurationSeconds < 60 || maxDurationSeconds < defaultDurationSeconds) throw new Error("Invalid duration settings");
+  const defaultDurationMinutes = Math.ceil(defaultDurationSeconds / 60);
+  const maxDurationMinutes = Math.ceil(maxDurationSeconds / 60);
   getDb()
     .prepare(
       `UPDATE settlement_settings
-       SET immediate_enabled = ?, scheduled_enabled = ?, default_settlement_mode = ?, default_duration_minutes = ?, max_duration_minutes = ?, processing_reason = ?
+       SET immediate_enabled = ?, scheduled_enabled = ?, default_settlement_mode = ?, default_duration_minutes = ?, default_duration_seconds = ?, max_duration_minutes = ?, max_duration_seconds = ?, processing_reason = ?
        WHERE id = 1`,
     )
-    .run(input.immediateEnabled ? 1 : 0, input.scheduledEnabled ? 1 : 0, input.defaultMode, input.defaultDurationMinutes, input.maxDurationMinutes, input.processingReason);
+    .run(input.immediateEnabled ? 1 : 0, input.scheduledEnabled ? 1 : 0, input.defaultMode, defaultDurationMinutes, defaultDurationSeconds, maxDurationMinutes, maxDurationSeconds, input.processingReason);
 }
 
 export function setUserEnabled(userId: string, enabled: boolean) {
@@ -250,6 +285,13 @@ export function setUserEnabled(userId: string, enabled: boolean) {
 export function resetUserPassword(userId: string, password: string) {
   if (password.length < 8) throw new Error("Password must be at least 8 characters");
   getDb().prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(password), userId);
+}
+
+export function updateUserDisplayName(userId: string, displayName: string) {
+  seedDatabase();
+  const trimmed = displayName.trim();
+  if (trimmed.length < 2 || trimmed.length > 48) throw new Error("Display name must be 2-48 characters");
+  getDb().prepare("UPDATE users SET display_name = ? WHERE id = ?").run(trimmed, userId);
 }
 
 export function saveAssetDefinition(input: {
@@ -284,7 +326,13 @@ export function saveAssetDefinition(input: {
         .run(assetId, symbol, input.name.trim(), input.network.trim(), input.displayAddress.trim(), input.enabled ? 1 : 0, input.withdrawalEnabled ? 1 : 0, input.withdrawalAvailableAt || null);
       const wallets = getDb().prepare("SELECT id FROM wallets").all() as unknown as { id: string }[];
       const insertBalance = getDb().prepare("INSERT INTO wallet_balances (wallet_id, asset_id, amount_atoms) VALUES (?, ?, '0')");
-      for (const wallet of wallets) insertBalance.run(wallet.id, assetId);
+      const insertAddress = getDb().prepare("INSERT INTO wallet_asset_addresses (wallet_id, asset_id, display_address, created_at) VALUES (?, ?, ?, ?)");
+      const now = new Date().toISOString();
+      for (const wallet of wallets) {
+        insertBalance.run(wallet.id, assetId);
+        const user = getDb().prepare("SELECT username FROM users JOIN wallets ON wallets.user_id = users.id WHERE wallets.id = ?").get(wallet.id) as { username: string };
+        insertAddress.run(wallet.id, assetId, generateWalletAddress(symbol, input.network.trim(), wallet.id, user.username), now);
+      }
     }
   });
   return assetId;
@@ -294,6 +342,7 @@ export function deleteAssetDefinition(assetId: string) {
   const inUse = getDb().prepare("SELECT id FROM transfers WHERE asset_id = ? LIMIT 1").get(assetId);
   if (inUse) throw new Error("Asset has transfer history and cannot be removed");
   transaction(() => {
+    getDb().prepare("DELETE FROM wallet_asset_addresses WHERE asset_id = ?").run(assetId);
     getDb().prepare("DELETE FROM wallet_balances WHERE asset_id = ?").run(assetId);
     getDb().prepare("DELETE FROM asset_definitions WHERE id = ?").run(assetId);
   });
@@ -303,13 +352,17 @@ function getTransferRows(whereSql: string, params: SQLInputValue[]) {
   return getDb()
     .prepare(
       `SELECT transfers.*, asset_definitions.symbol, asset_definitions.name, asset_definitions.network,
-              sender_user.username AS sender_username, recipient_user.username AS recipient_username
+              sender_user.username AS sender_username, recipient_user.username AS recipient_username,
+              COALESCE(sender_address.display_address, '') AS sender_display_address,
+              COALESCE(recipient_address.display_address, '') AS recipient_display_address
        FROM transfers
        JOIN asset_definitions ON asset_definitions.id = transfers.asset_id
        JOIN wallets sender_wallet ON sender_wallet.id = transfers.sender_wallet_id
        JOIN users sender_user ON sender_user.id = sender_wallet.user_id
        JOIN wallets recipient_wallet ON recipient_wallet.id = transfers.recipient_wallet_id
        JOIN users recipient_user ON recipient_user.id = recipient_wallet.user_id
+       LEFT JOIN wallet_asset_addresses sender_address ON sender_address.wallet_id = transfers.sender_wallet_id AND sender_address.asset_id = transfers.asset_id
+       LEFT JOIN wallet_asset_addresses recipient_address ON recipient_address.wallet_id = transfers.recipient_wallet_id AND recipient_address.asset_id = transfers.asset_id
        ${whereSql}
        ORDER BY transfers.created_at DESC`,
     )
@@ -320,6 +373,7 @@ function mapTransfer(row: TransferRow, now: Date) {
   const processingAtoms = row.status === "processing" && row.processing_started_at && row.available_at ? settledAtoms(BigInt(row.amount_atoms), row.processing_started_at, row.available_at, now) : 0n;
   const remainingAtoms = row.status === "processing" ? BigInt(row.amount_atoms) - processingAtoms : 0n;
   const progress = row.status === "completed" ? 100 : Number((processingAtoms * 10_000n) / BigInt(row.amount_atoms || "1")) / 100;
+  const durationSeconds = row.duration_seconds ?? row.duration_minutes * 60;
   return {
     id: row.id,
     senderWalletId: row.sender_wallet_id,
@@ -339,11 +393,13 @@ function mapTransfer(row: TransferRow, now: Date) {
     processingStartedAt: row.processing_started_at || undefined,
     availableAt: row.available_at || undefined,
     completedAt: row.completed_at || undefined,
-    durationMinutes: row.duration_minutes,
+    durationSeconds,
     processingReason: row.processing_reason,
     networkBlockAtCreation: row.network_block_at_creation,
     senderUsername: row.sender_username,
     recipientUsername: row.recipient_username,
+    senderDisplayAddress: row.sender_display_address,
+    recipientDisplayAddress: row.recipient_display_address,
     processingAmount: atomsToNumber(processingAtoms, row.symbol),
     processingAtoms: processingAtoms.toString(),
     remainingAmount: atomsToNumber(remainingAtoms, row.symbol),
@@ -360,10 +416,15 @@ function transferToActivity(transferItem: ReturnType<typeof mapTransfer>, wallet
     type: outgoing ? "send" : "receive",
     amount: outgoing ? -transferItem.amount : transferItem.amount,
     timestamp: transferItem.createdAt,
-    status: transferItem.status === "processing" ? "scheduled" : transferItem.status,
-    displayAddress: outgoing ? transferItem.recipientUsername : transferItem.senderUsername,
+    status: transferItem.status,
+    displayAddress: outgoing ? transferItem.recipientDisplayAddress : transferItem.senderDisplayAddress,
     txHash: transferItem.transferReference,
     progress: transferItem.progress,
+    pendingAmount: outgoing && transferItem.status === "processing" ? transferItem.amount : 0,
+    processingAmount: !outgoing && transferItem.status === "processing" ? transferItem.processingAmount : 0,
+    remainingAmount: !outgoing && transferItem.status === "processing" ? transferItem.remainingAmount : 0,
+    availableAt: transferItem.availableAt,
+    settlementMode: transferItem.settlementMode,
   };
 }
 

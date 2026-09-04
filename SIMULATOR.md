@@ -1,4 +1,4 @@
-# Wallet Simulator Architecture
+# Titan Wallet Architecture
 
 This project is a web/PWA simulator. It does not depend on Android Studio, Android SDK, Gradle, Java/Kotlin, React Native native modules, Xcode, or CocoaPods.
 

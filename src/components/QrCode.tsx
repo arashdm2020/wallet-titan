@@ -8,7 +8,7 @@ export function QrCode({ value }: { value: string }) {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    QRCode.toCanvas(canvasRef.current, value || "wallet-simulator", {
+    QRCode.toCanvas(canvasRef.current, value || "titan-wallet", {
       width: 220,
       margin: 2,
       color: {

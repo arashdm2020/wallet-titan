@@ -15,10 +15,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Titan Wallet",
-  description: "A mobile-first sandbox cryptocurrency wallet with live USD prices.",
+  description: "A mobile-first cryptocurrency portfolio wallet with live USD prices.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
+      { url: "/favicon.png", sizes: "64x64", type: "image/png" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
@@ -35,6 +36,8 @@ export const viewport: Viewport = {
   themeColor: "#2563eb",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 

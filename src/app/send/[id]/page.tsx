@@ -60,9 +60,11 @@ export default function SendPage() {
           <label className="mt-8 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient</label>
           <input
             id="address"
+            type="password"
             value={recipient}
             onChange={(event) => setRecipient(event.target.value)}
-            placeholder={asset.symbol === "ETH" ? "0x..." : asset.symbol === "BTC" ? "bc1..." : "T..."}
+            autoComplete="off"
+            placeholder="Wallet account"
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base outline-none focus:border-blue-500 focus:bg-white"
           />
           {recipient && !recipientValidation.valid ? <p className="mt-2 text-xs font-semibold text-rose-500">{recipientValidation.error}</p> : null}

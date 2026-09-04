@@ -8,7 +8,7 @@ import { AssetIcon } from "@/components/AssetIcon";
 import { StatusPill } from "@/components/StatusPill";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
-import { formatCrypto, formatDateTime, formatPercent, formatUsd, shortAddress } from "@/utils/formatters";
+import { formatCrypto, formatDateTime, formatPercent, formatUsd } from "@/utils/formatters";
 
 export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
@@ -71,8 +71,8 @@ export default function AssetDetailPage() {
         </div>
 
         <div className="mt-4 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <p className="font-bold">Display address</p>
-          <p className="mt-2 break-all text-sm text-slate-500">{shortAddress(asset.displayAddress)}</p>
+          <p className="font-bold">Wallet account</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Ready for transfers within your Titan Wallet account.</p>
         </div>
 
         <div className="mt-4 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">

@@ -42,7 +42,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black">Settings</h1>
-            <p className="mt-1 text-sm text-slate-500">Titan Wallet · Sandbox</p>
+            <p className="mt-1 text-sm text-slate-500">Personalize your Titan Wallet experience</p>
           </div>
           <Image src="/brand/titan-wallet.png" alt="" width={48} height={48} className="h-12 w-12 rounded-2xl object-cover shadow-sm" priority />
         </div>

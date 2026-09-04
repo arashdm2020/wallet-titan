@@ -6,7 +6,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { StatusPill } from "@/components/StatusPill";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
-import { formatCrypto, formatDateTime, shortAddress } from "@/utils/formatters";
+import { formatCrypto, formatDateTime } from "@/utils/formatters";
 
 export default function ActivityPage() {
   const { session, loading, activities, getAsset } = useWalletStore();
@@ -42,7 +42,7 @@ export default function ActivityPage() {
                       Processed {formatCrypto(activity.processingAmount || 0, asset?.symbol || "")} · Remaining {formatCrypto(activity.remainingAmount || 0, asset?.symbol || "")}
                     </p>
                   ) : null}
-                  <p className="mt-1 truncate text-xs text-slate-400">Address {shortAddress(activity.displayAddress)} · ref {activity.txHash || "none"}</p>
+                  <p className="mt-1 truncate text-xs text-slate-400">Transfer reference {activity.txHash || "not available"}</p>
                 </Link>
               );
             })}

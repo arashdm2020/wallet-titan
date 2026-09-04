@@ -7,7 +7,6 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { QrCode } from "@/components/QrCode";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
-import { shortAddress } from "@/utils/formatters";
 
 export default function ReceivePage() {
   const params = useParams<{ id: string }>();
@@ -35,9 +34,8 @@ export default function ReceivePage() {
             <QrCode value={asset.displayAddress} />
           </div>
 
-          <p className="mt-8 text-sm font-semibold text-slate-500">Configured display address</p>
-          <p className="mt-2 break-all rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-900">{shortAddress(asset.displayAddress)}</p>
-          <p className="mt-4 text-sm leading-6 text-slate-500">Sandbox address. Do not send real funds to this display address.</p>
+          <p className="mt-8 text-sm font-semibold text-slate-500">Wallet account QR</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Use this account QR for transfers within Titan Wallet.</p>
         </div>
       </section>
     </WalletLayout>

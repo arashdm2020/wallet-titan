@@ -1,7 +1,7 @@
 {
   "name": "Titan Wallet",
   "short_name": "Titan",
-  "description": "A mobile-first sandbox cryptocurrency wallet with live USD prices.",
+  "description": "A mobile-first cryptocurrency portfolio wallet with live USD prices.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

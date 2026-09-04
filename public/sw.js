@@ -1,7 +1,9 @@
-const CACHE_NAME = "titan-wallet-v3";
+const CACHE_NAME = "titan-wallet-v4";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
+  "/favicon.png",
+  "/brand/titan-wallet.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/maskable-192.png",

@@ -31,7 +31,6 @@ export default function Home() {
                 <h1 className="text-2xl font-bold">{portfolio?.wallet.name || "Titan Wallet"}</h1>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Sandbox</span>
                 <Image src="/brand/titan-wallet.png" alt="" width={40} height={40} className="h-10 w-10 rounded-2xl object-cover shadow-lg shadow-blue-950/20" />
               </div>
             </div>
@@ -136,7 +135,7 @@ function Onboarding({
           </div>
           <Image src="/brand/titan-wallet.png" alt="" width={64} height={64} className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-blue-950/20" priority />
         </div>
-        <p className="mt-8 text-sm leading-6 text-blue-50">Track your crypto portfolio with live USD pricing, clean mobile flows, and a sandbox transfer ledger.</p>
+        <p className="mt-8 text-sm leading-6 text-blue-50">Track your crypto portfolio with live USD pricing, clear wallet activity, and simple transfer flows.</p>
       </div>
 
       <div className="mt-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">

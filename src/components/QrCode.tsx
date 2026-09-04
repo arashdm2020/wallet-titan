@@ -18,5 +18,5 @@ export function QrCode({ value }: { value: string }) {
     });
   }, [value]);
 
-  return <canvas ref={canvasRef} data-testid="receive-qr" className="h-[220px] w-[220px] rounded-3xl bg-white p-2 shadow-inner" aria-label="QR code containing configured display address" />;
+  return <canvas ref={canvasRef} data-testid="receive-qr" className="h-[220px] w-[220px] rounded-3xl bg-white p-2 shadow-inner" aria-label="Wallet account QR code" />;
 }

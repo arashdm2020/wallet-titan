@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { WalletLayout } from "@/components/WalletLayout";
 import type { WalletTransfer } from "@/domain/wallet";
-import { formatCrypto, formatDateTime, shortAddress } from "@/utils/formatters";
+import { formatCrypto, formatDateTime } from "@/utils/formatters";
 
 export default function TransferPage() {
   const params = useParams<{ id: string }>();
@@ -87,7 +87,6 @@ export default function TransferPage() {
               <p className="text-sm font-semibold text-blue-600">Transfer Receipt</p>
               <h1 className="text-2xl font-black">{transfer.name}</h1>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-600">Sandbox</span>
           </div>
 
           <div className="mt-6 rounded-2xl bg-slate-50 p-4">
@@ -126,8 +125,8 @@ export default function TransferPage() {
           )}
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Info label="Sender" value={shortAddress(transfer.senderDisplayAddress)} compact />
-            <Info label="Recipient" value={shortAddress(transfer.recipientDisplayAddress)} compact />
+            <Info label="Sender" value="Wallet account" compact />
+            <Info label="Recipient" value="Wallet account" compact />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
           {transfer.completedAt ? <Info label="Completed" value={formatDateTime(transfer.completedAt)} /> : null}

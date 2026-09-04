@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
 import { QrCode } from "@/components/QrCode";
+import { useToast } from "@/components/ToastProvider";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
 
@@ -12,10 +13,33 @@ export default function ReceivePage() {
   const params = useParams<{ id: string }>();
   const { session, getAsset, loading } = useWalletStore();
   const asset = getAsset(params.id);
+  const toast = useToast();
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
   if (!asset && loading) return <WalletLayout><div className="p-6">Loading receive flow</div></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
+
+  const copyAddress = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(asset.displayAddress);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = asset.displayAddress;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.select();
+        const copied = document.execCommand("copy");
+        textArea.remove();
+        if (!copied) throw new Error("Copy command failed");
+      }
+      toast({ tone: "success", title: "Address copied", description: "The receiving address is ready to paste." });
+    } catch {
+      toast({ tone: "error", title: "Copy failed", description: "Copy the address manually from the field." });
+    }
+  };
 
   return (
     <WalletLayout>
@@ -34,8 +58,11 @@ export default function ReceivePage() {
             <QrCode value={asset.displayAddress} />
           </div>
 
-          <p className="mt-8 text-sm font-semibold text-slate-500">Wallet account QR</p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">Use this account QR for transfers within Titan Wallet.</p>
+          <p className="mt-8 text-sm font-semibold text-slate-500">Receiving address</p>
+          <p className="mt-2 break-all rounded-2xl bg-slate-50 p-4 text-left text-sm font-semibold text-slate-900">{asset.displayAddress}</p>
+          <button type="button" onClick={copyAddress} className="mt-3 h-12 w-full rounded-2xl bg-blue-600 font-bold text-white">
+            Copy Address
+          </button>
         </div>
       </section>
     </WalletLayout>

@@ -13,7 +13,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[430px] border-t border-slate-200 bg-white/95 px-6 pb-[max(0.8rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-18px_40px_rgba(15,23,42,0.08)] backdrop-blur">
+    <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[430px] border-t border-slate-200 bg-white/95 px-5 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-18px_40px_rgba(15,23,42,0.08)] backdrop-blur">
       <div className="grid grid-cols-3">
         {navItems.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

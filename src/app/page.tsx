@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { AssetIcon } from "@/components/AssetIcon";
+import { ServerStatusIndicator } from "@/components/ServerStatusIndicator";
 import { useToast } from "@/components/ToastProvider";
 import { WalletLayout } from "@/components/WalletLayout";
 import { useWalletStore } from "@/state/walletStore";
@@ -31,6 +32,7 @@ export default function Home() {
                 <h1 className="text-2xl font-bold">{portfolio?.wallet.name || "Titan Wallet"}</h1>
               </div>
               <div className="flex items-center gap-2">
+                <ServerStatusIndicator />
                 <Image src="/brand/titan-wallet.png" alt="" width={40} height={40} className="h-10 w-10 rounded-2xl object-cover shadow-lg shadow-blue-950/20" />
               </div>
             </div>

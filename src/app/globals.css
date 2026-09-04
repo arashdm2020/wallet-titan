@@ -5,6 +5,11 @@
   --foreground: #0f172a;
 }
 
+html.dark {
+  --background: #070b14;
+  --foreground: #e5edf8;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -19,6 +24,30 @@ body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
+html.dark .bg-slate-200 { background-color: #111827; }
+html.dark .bg-\[\#f7f9fc\] { background-color: #0b1220; }
+html.dark .bg-white { background-color: #111827; }
+html.dark .bg-white\/95 { background-color: rgb(17 24 39 / 0.95); }
+html.dark .bg-slate-50 { background-color: #182235; }
+html.dark .bg-slate-100 { background-color: #1e293b; }
+html.dark .bg-blue-50 { background-color: #172554; }
+html.dark .bg-amber-50 { background-color: #3b2a12; }
+html.dark .bg-emerald-50 { background-color: #0d3328; }
+html.dark .text-slate-950,
+html.dark .text-slate-900 { color: #f8fafc; }
+html.dark .text-slate-700,
+html.dark .text-slate-600 { color: #cbd5e1; }
+html.dark .text-slate-500 { color: #94a3b8; }
+html.dark .text-slate-400 { color: #8291a8; }
+html.dark .text-blue-900 { color: #bfdbfe; }
+html.dark .text-amber-900 { color: #fde68a; }
+html.dark .text-emerald-900 { color: #a7f3d0; }
+html.dark .border-slate-100,
+html.dark .ring-slate-100 { border-color: #243247; }
+html.dark .border-slate-200 { border-color: #334155; }
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #243247; }
+html.dark .focus\:bg-white:focus { background-color: #1e293b; }
 
 button,
 a,

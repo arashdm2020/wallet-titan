@@ -80,6 +80,7 @@ export interface WalletTransfer {
   networkBlockAtCreation: number;
   senderUsername: string;
   recipientUsername: string;
+  recipientExternal?: boolean;
   senderDisplayAddress: string;
   recipientDisplayAddress: string;
   processingAmount: number;

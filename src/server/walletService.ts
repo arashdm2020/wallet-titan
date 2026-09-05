@@ -43,6 +43,7 @@ interface TransferRow {
   id: string;
   sender_wallet_id: string;
   recipient_wallet_id: string;
+  recipient_external: number;
   asset_id: string;
   amount_atoms: string;
   settlement_mode: "immediate" | "scheduled";
@@ -63,7 +64,7 @@ interface TransferRow {
   sender_username: string;
   recipient_username: string;
   sender_display_address: string;
-  recipient_display_address: string;
+  recipient_display_address: string | null;
 }
 
 export function authenticate(username: string, password: string) {
@@ -110,14 +111,15 @@ export function finalizeDueTransfers(now = new Date()) {
   seedDatabase();
   return transaction(() => {
     const due = getDb()
-      .prepare("SELECT id, recipient_wallet_id, asset_id, amount_atoms FROM transfers WHERE settlement_mode = 'scheduled' AND status = 'processing' AND available_at <= ?")
-      .all(now.toISOString()) as Pick<TransferRow, "id" | "recipient_wallet_id" | "asset_id" | "amount_atoms">[];
+      .prepare("SELECT id, recipient_wallet_id, recipient_external, asset_id, amount_atoms FROM transfers WHERE settlement_mode = 'scheduled' AND status = 'processing' AND available_at <= ?")
+      .all(now.toISOString()) as Pick<TransferRow, "id" | "recipient_wallet_id" | "recipient_external" | "asset_id" | "amount_atoms">[];
     for (const transferRow of due) {
       getDb()
         .prepare("UPDATE transfers SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'processing'")
         .run(now.toISOString(), transferRow.id);
       const changed = getDb().prepare("SELECT changes() AS changed").get() as { changed: number };
       if (changed.changed !== 1) continue;
+      if (transferRow.recipient_external) continue;
       getDb()
         .prepare("UPDATE wallet_balances SET amount_atoms = CAST(CAST(amount_atoms AS INTEGER) + CAST(? AS INTEGER) AS TEXT) WHERE wallet_id = ? AND asset_id = ?")
         .run(transferRow.amount_atoms, transferRow.recipient_wallet_id, transferRow.asset_id);
@@ -153,7 +155,7 @@ export function getWalletSnapshot(session: AuthSession, now = new Date()) {
     wallet: { id: session.walletId, baseCurrency: "USD" as const, walletType: session.walletType },
     assets: assets.map((asset) => {
       const incoming = transfers
-        .filter((transferItem) => transferItem.recipientWalletId === session.walletId && transferItem.assetId === asset.id && transferItem.status === "processing")
+        .filter((transferItem) => !transferItem.recipientExternal && transferItem.recipientWalletId === session.walletId && transferItem.assetId === asset.id && transferItem.status === "processing")
         .reduce(
           (total, transferItem) => ({
             totalAtoms: total.totalAtoms + BigInt(transferItem.amountAtoms),
@@ -355,9 +357,10 @@ function getTransferRows(whereSql: string, params: SQLInputValue[]) {
   return getDb()
     .prepare(
       `SELECT transfers.*, asset_definitions.symbol, asset_definitions.name, asset_definitions.network,
-              sender_user.username AS sender_username, recipient_user.username AS recipient_username,
+              sender_user.username AS sender_username,
+              CASE WHEN transfers.recipient_external = 1 THEN 'External recipient' ELSE recipient_user.username END AS recipient_username,
               COALESCE(sender_address.display_address, '') AS sender_display_address,
-              COALESCE(recipient_address.display_address, '') AS recipient_display_address
+              COALESCE(transfers.recipient_display_address, recipient_address.display_address, '') AS recipient_display_address
        FROM transfers
        JOIN asset_definitions ON asset_definitions.id = transfers.asset_id
        JOIN wallets sender_wallet ON sender_wallet.id = transfers.sender_wallet_id
@@ -381,6 +384,7 @@ function mapTransfer(row: TransferRow, now: Date) {
     id: row.id,
     senderWalletId: row.sender_wallet_id,
     recipientWalletId: row.recipient_wallet_id,
+    recipientExternal: Boolean(row.recipient_external),
     assetId: row.asset_id,
     symbol: row.symbol,
     name: row.name,

@@ -23,8 +23,8 @@ export function createTransfer(input: {
     if (!senderAsset) throw new Error("Sender wallet does not support this asset");
 
     const recipient = resolveRecipient(input.recipient, input.assetId, asset);
-    if (!recipient) throw new Error("Recipient not found");
-    if (recipient.wallet_id === input.senderWalletId) throw new Error("Sender and recipient must differ");
+    const recipientWalletId = recipient.wallet_id ?? input.senderWalletId;
+    if (!recipient.external && recipientWalletId === input.senderWalletId) throw new Error("Sender and recipient must differ");
 
     const settings = getDb().prepare("SELECT * FROM settlement_settings WHERE id = 1").get() as {
       immediate_enabled: number;
@@ -70,14 +70,16 @@ export function createTransfer(input: {
     getDb()
       .prepare(
         `INSERT INTO transfers
-         (id, sender_wallet_id, recipient_wallet_id, asset_id, amount_atoms, settlement_mode, status, simulation,
+         (id, sender_wallet_id, recipient_wallet_id, recipient_display_address, recipient_external, asset_id, amount_atoms, settlement_mode, status, simulation,
           transfer_reference, created_at, processing_started_at, available_at, completed_at, duration_minutes, duration_seconds, processing_reason, network_block_at_creation)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         transferId,
         input.senderWalletId,
-        recipient.wallet_id,
+        recipientWalletId,
+        recipient.display_address,
+        recipient.external ? 1 : 0,
         input.assetId,
         amountAtoms.toString(),
         mode,
@@ -96,17 +98,17 @@ export function createTransfer(input: {
       .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'debit', ?, ?)")
       .run(id("ledger"), input.senderWalletId, input.assetId, transferId, amountAtoms.toString(), createdAt);
 
-    if (mode === "immediate") {
+    if (mode === "immediate" && !recipient.external) {
       getDb()
         .prepare("UPDATE wallet_balances SET amount_atoms = CAST(CAST(amount_atoms AS INTEGER) + CAST(? AS INTEGER) AS TEXT) WHERE wallet_id = ? AND asset_id = ?")
-        .run(amountAtoms.toString(), recipient.wallet_id, input.assetId);
+        .run(amountAtoms.toString(), recipientWalletId, input.assetId);
       getDb()
         .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'credit', ?, ?)")
-        .run(id("ledger"), recipient.wallet_id, input.assetId, transferId, amountAtoms.toString(), createdAt);
-    } else {
+        .run(id("ledger"), recipientWalletId, input.assetId, transferId, amountAtoms.toString(), createdAt);
+    } else if (mode === "scheduled" && !recipient.external) {
       getDb()
         .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'hold', ?, ?)")
-        .run(id("ledger"), recipient.wallet_id, input.assetId, transferId, amountAtoms.toString(), createdAt);
+        .run(id("ledger"), recipientWalletId, input.assetId, transferId, amountAtoms.toString(), createdAt);
     }
 
     return { id: transferId, transferReference: reference, status, settlementMode: mode };
@@ -160,11 +162,12 @@ function resolveRecipient(input: string, assetId: string, asset: { symbol: strin
          LIMIT 1`,
       )
       .get(assetId, recipient) as { wallet_id: string } | undefined;
-    return byAddress || null;
+    if (byAddress) return { ...byAddress, display_address: recipient, external: false };
+    return { wallet_id: null, display_address: recipient, external: true };
   }
 
   if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(recipient)) throw new Error(addressValidation.error);
-  return (getDb()
+  const byUsername = (getDb()
     .prepare(
       `SELECT wallets.id AS wallet_id
        FROM users
@@ -173,5 +176,7 @@ function resolveRecipient(input: string, assetId: string, asset: { symbol: strin
        WHERE lower(users.username) = lower(?) AND users.enabled = 1
        LIMIT 1`,
     )
-    .get(assetId, recipient) as { wallet_id: string } | undefined) || null;
+    .get(assetId, recipient) as { wallet_id: string } | undefined);
+  if (byUsername) return { ...byUsername, display_address: recipient, external: false };
+  return { wallet_id: null, display_address: recipient, external: true };
 }

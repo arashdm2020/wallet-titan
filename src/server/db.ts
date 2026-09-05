@@ -89,6 +89,8 @@ export function migrate() {
       id TEXT PRIMARY KEY,
       sender_wallet_id TEXT NOT NULL REFERENCES wallets(id),
       recipient_wallet_id TEXT NOT NULL REFERENCES wallets(id),
+      recipient_display_address TEXT,
+      recipient_external INTEGER NOT NULL DEFAULT 0,
       asset_id TEXT NOT NULL REFERENCES asset_definitions(id),
       amount_atoms TEXT NOT NULL,
       settlement_mode TEXT NOT NULL CHECK(settlement_mode IN ('immediate','scheduled')),
@@ -130,6 +132,8 @@ export function migrate() {
   addColumnIfMissing("settlement_settings", "max_duration_seconds", "INTEGER");
   addColumnIfMissing("settlement_settings", "daily_withdrawal_limit_usd_cents", "INTEGER");
   addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
+  addColumnIfMissing("transfers", "recipient_display_address", "TEXT");
+  addColumnIfMissing("transfers", "recipient_external", "INTEGER NOT NULL DEFAULT 0");
   db.exec(`
     UPDATE settlement_settings
     SET default_duration_seconds = COALESCE(default_duration_seconds, default_duration_minutes * 60),

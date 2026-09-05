@@ -18,8 +18,14 @@ export function createTransfer(input: {
     if (amountAtoms <= 0n) throw new Error("Amount must be greater than zero");
 
     const senderAsset = getDb()
-      .prepare("SELECT amount_atoms FROM wallet_balances WHERE wallet_id = ? AND asset_id = ?")
-      .get(input.senderWalletId, input.assetId) as { amount_atoms: string } | undefined;
+      .prepare(
+        `SELECT wallet_balances.amount_atoms, users.role AS sender_role
+         FROM wallet_balances
+         JOIN wallets ON wallets.id = wallet_balances.wallet_id
+         JOIN users ON users.id = wallets.user_id
+         WHERE wallet_balances.wallet_id = ? AND wallet_balances.asset_id = ?`,
+      )
+      .get(input.senderWalletId, input.assetId) as { amount_atoms: string; sender_role: "ADMIN" | "USER" } | undefined;
     if (!senderAsset) throw new Error("Sender wallet does not support this asset");
 
     const recipient = resolveRecipient(input.recipient, input.assetId, asset);
@@ -51,13 +57,16 @@ export function createTransfer(input: {
     const networkFeeUsdCents = networkFeeUsdCentsForTransfer(transferUsdCents);
     const networkFeeAtoms = assetAtomsForUsdCents(networkFeeUsdCents, asset.symbol, getUsdPrice(asset.symbol));
     const totalDebitAtoms = amountAtoms + networkFeeAtoms;
-    if (dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
+    const now = new Date();
+    if (senderAsset.sender_role !== "ADMIN" && getRecentTransferCount(input.senderWalletId, now) > 0) {
+      throw new Error("Only one transfer per 24 hours");
+    }
+    if (senderAsset.sender_role !== "ADMIN" && dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
       throw new Error("Daily withdrawal limit exceeded");
     }
 
     if (BigInt(senderAsset.amount_atoms) < totalDebitAtoms) throw new Error("Insufficient spendable balance for amount and network fee");
 
-    const now = new Date();
     const createdAt = now.toISOString();
     const transferId = id("transfer");
     const availableAt = mode === "scheduled" ? new Date(now.getTime() + durationSeconds * 1000).toISOString() : null;
@@ -156,6 +165,20 @@ function getDailySpentUsdCents(walletId: string, now: Date) {
     )
     .all(walletId, startOfUtcDay) as unknown as { amount_atoms: string; symbol: string }[];
   return rows.reduce((total, row) => total + usdCentsForAtoms(BigInt(row.amount_atoms), row.symbol, getUsdPrice(row.symbol)), 0n);
+}
+
+function getRecentTransferCount(walletId: string, now: Date) {
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM transfers
+       WHERE sender_wallet_id = ?
+         AND created_at >= ?
+         AND status IN ('processing', 'completed')`,
+    )
+    .get(walletId, cutoff) as { count: number };
+  return row.count;
 }
 
 function usdCentsForAtoms(amountAtoms: bigint, symbol: string, priceUsd: number) {

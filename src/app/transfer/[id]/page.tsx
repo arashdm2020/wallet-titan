@@ -7,7 +7,7 @@ import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { PageLoader } from "@/components/LoadingUI";
 import { WalletLayout } from "@/components/WalletLayout";
 import type { WalletTransfer } from "@/domain/wallet";
-import { formatCrypto, formatDateTime } from "@/utils/formatters";
+import { formatCrypto, formatDateTime, formatUsd } from "@/utils/formatters";
 
 export default function TransferPage() {
   const params = useParams<{ id: string }>();
@@ -131,6 +131,7 @@ export default function TransferPage() {
             <WalletAddressDisplay address={appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference)} network={transfer.network} label="Recipient" />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
+          <Info label="Network fee" value={transfer.networkFee > 0 ? `${formatCrypto(transfer.networkFee, transfer.symbol)} · ${formatUsd(transfer.networkFeeUsd)}` : "No fee"} />
           {transfer.completedAt ? <Info label="Completed" value={formatDateTime(transfer.completedAt)} /> : null}
           <Info label="Reason" value={transfer.processingReason} />
           <Info label="Network Information" value={`${transfer.network} · Connected · Current Block: ${transfer.networkBlockAtCreation}`} />

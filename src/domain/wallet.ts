@@ -68,6 +68,9 @@ export interface WalletTransfer {
   amount: number;
   amountAtoms: string;
   amountDisplay: string;
+  networkFee: number;
+  networkFeeAtoms: string;
+  networkFeeUsd: number;
   settlementMode: SettlementMode;
   status: TransferStatus;
   simulation: boolean;

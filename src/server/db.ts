@@ -94,6 +94,8 @@ export function migrate() {
       recipient_external INTEGER NOT NULL DEFAULT 0,
       asset_id TEXT NOT NULL REFERENCES asset_definitions(id),
       amount_atoms TEXT NOT NULL,
+      network_fee_atoms TEXT NOT NULL DEFAULT '0',
+      network_fee_usd_cents INTEGER NOT NULL DEFAULT 0,
       settlement_mode TEXT NOT NULL CHECK(settlement_mode IN ('immediate','scheduled')),
       status TEXT NOT NULL CHECK(status IN ('pending','processing','completed','failed','cancelled')),
       simulation INTEGER NOT NULL DEFAULT 1,
@@ -134,6 +136,8 @@ export function migrate() {
   addColumnIfMissing("settlement_settings", "daily_withdrawal_limit_usd_cents", "INTEGER");
   addColumnIfMissing("users", "send_enabled", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
+  addColumnIfMissing("transfers", "network_fee_atoms", "TEXT NOT NULL DEFAULT '0'");
+  addColumnIfMissing("transfers", "network_fee_usd_cents", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("transfers", "recipient_display_address", "TEXT");
   addColumnIfMissing("transfers", "recipient_external", "INTEGER NOT NULL DEFAULT 0");
   db.exec(`

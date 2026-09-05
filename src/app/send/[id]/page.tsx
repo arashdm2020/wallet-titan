@@ -12,6 +12,7 @@ import { WalletLayout } from "@/components/WalletLayout";
 import { validateRecipientAddress } from "@/domain/address";
 import { useWalletStore } from "@/state/walletStore";
 import { formatCrypto, formatUsd } from "@/utils/formatters";
+import { estimateNetworkFeeUsd } from "@/utils/networkFee";
 
 export default function SendPage() {
   const params = useParams<{ id: string }>();
@@ -25,7 +26,10 @@ export default function SendPage() {
   const toast = useToast();
   const recipientValidation = useMemo(() => (asset ? validateRecipientAddress(recipient, asset) : { valid: false, error: "" }), [asset, recipient]);
   const numericAmount = Number(amount);
-  const amountValid = Number.isFinite(numericAmount) && numericAmount > 0 && numericAmount <= (asset?.availableBalance ?? asset?.balance ?? 0);
+  const networkFeeUsd = estimateNetworkFeeUsd(numericAmount, asset?.usdPrice);
+  const networkFeeAmount = asset?.usdPrice && networkFeeUsd > 0 ? networkFeeUsd / asset.usdPrice : 0;
+  const availableBalance = asset?.availableBalance ?? asset?.balance ?? 0;
+  const amountValid = Number.isFinite(numericAmount) && numericAmount > 0 && numericAmount + networkFeeAmount <= availableBalance;
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
   if (!asset && loading) return <WalletLayout><PageLoader label="Loading send flow" /></WalletLayout>;
@@ -91,7 +95,7 @@ export default function SendPage() {
             />
             <button type="button" data-testid="max-send" onClick={() => setAmount(String(asset.availableBalance ?? asset.balance))} className="w-20 rounded-2xl bg-slate-900 text-sm font-bold text-white">MAX</button>
           </div>
-          {amount && !amountValid ? <p className="mt-2 text-xs font-semibold text-rose-500">Enter an amount up to the available balance.</p> : null}
+          {amount && !amountValid ? <p className="mt-2 text-xs font-semibold text-rose-500">Enter an amount that covers the transfer and network fee.</p> : null}
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-2xl bg-slate-50 p-3">
@@ -99,8 +103,8 @@ export default function SendPage() {
               <p className="mt-1 font-bold">{formatCrypto(asset.availableBalance ?? asset.balance, asset.symbol)}</p>
             </div>
             <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs font-semibold text-slate-500">Network fee</p>
-              <p className="mt-1 font-bold">{formatUsd(0)}</p>
+              <p className="text-xs font-semibold text-slate-500">Estimated network fee</p>
+              <p className="mt-1 font-bold">{networkFeeUsd > 0 ? `${formatCrypto(networkFeeAmount, asset.symbol)} · ${formatUsd(networkFeeUsd)}` : "No fee"}</p>
             </div>
           </div>
 

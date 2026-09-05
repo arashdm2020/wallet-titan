@@ -48,11 +48,14 @@ export function createTransfer(input: {
     const dailyLimitCents = BigInt(settings.daily_withdrawal_limit_usd_cents ?? 50_000_000);
     const dailySpentCents = getDailySpentUsdCents(input.senderWalletId, new Date());
     const transferUsdCents = usdCentsForAtoms(amountAtoms, asset.symbol, getUsdPrice(asset.symbol));
+    const networkFeeUsdCents = networkFeeUsdCentsForTransfer(transferUsdCents);
+    const networkFeeAtoms = assetAtomsForUsdCents(networkFeeUsdCents, asset.symbol, getUsdPrice(asset.symbol));
+    const totalDebitAtoms = amountAtoms + networkFeeAtoms;
     if (dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
       throw new Error("Daily withdrawal limit exceeded");
     }
 
-    if (BigInt(senderAsset.amount_atoms) < amountAtoms) throw new Error("Insufficient spendable balance");
+    if (BigInt(senderAsset.amount_atoms) < totalDebitAtoms) throw new Error("Insufficient spendable balance for amount and network fee");
 
     const now = new Date();
     const createdAt = now.toISOString();
@@ -63,16 +66,16 @@ export function createTransfer(input: {
 
     getDb()
       .prepare("UPDATE wallet_balances SET amount_atoms = CAST(CAST(amount_atoms AS INTEGER) - CAST(? AS INTEGER) AS TEXT) WHERE wallet_id = ? AND asset_id = ? AND CAST(amount_atoms AS INTEGER) >= CAST(? AS INTEGER)")
-      .run(amountAtoms.toString(), input.senderWalletId, input.assetId, amountAtoms.toString());
+      .run(totalDebitAtoms.toString(), input.senderWalletId, input.assetId, totalDebitAtoms.toString());
     const changed = getDb().prepare("SELECT changes() AS changed").get() as { changed: number };
     if (changed.changed !== 1) throw new Error("Insufficient spendable balance");
 
     getDb()
       .prepare(
         `INSERT INTO transfers
-         (id, sender_wallet_id, recipient_wallet_id, recipient_display_address, recipient_external, asset_id, amount_atoms, settlement_mode, status, simulation,
+         (id, sender_wallet_id, recipient_wallet_id, recipient_display_address, recipient_external, asset_id, amount_atoms, network_fee_atoms, network_fee_usd_cents, settlement_mode, status, simulation,
           transfer_reference, created_at, processing_started_at, available_at, completed_at, duration_minutes, duration_seconds, processing_reason, network_block_at_creation)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         transferId,
@@ -82,6 +85,8 @@ export function createTransfer(input: {
         recipient.external ? 1 : 0,
         input.assetId,
         amountAtoms.toString(),
+        networkFeeAtoms.toString(),
+        Number(networkFeeUsdCents),
         mode,
         status,
         reference,
@@ -97,6 +102,11 @@ export function createTransfer(input: {
     getDb()
       .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'debit', ?, ?)")
       .run(id("ledger"), input.senderWalletId, input.assetId, transferId, amountAtoms.toString(), createdAt);
+    if (networkFeeAtoms > 0n) {
+      getDb()
+        .prepare("INSERT INTO ledger_entries (id, wallet_id, asset_id, transfer_id, type, amount_atoms, created_at) VALUES (?, ?, ?, ?, 'debit', ?, ?)")
+        .run(id("ledger"), input.senderWalletId, input.assetId, transferId, networkFeeAtoms.toString(), createdAt);
+    }
 
     if (mode === "immediate" && !recipient.external) {
       getDb()
@@ -113,6 +123,24 @@ export function createTransfer(input: {
 
     return { id: transferId, transferReference: reference, status, settlementMode: mode };
   });
+}
+
+function networkFeeUsdCentsForTransfer(transferUsdCents: bigint) {
+  const firstThresholdCents = 100_000n;
+  const tierWidthCents = 900_000n;
+  const feePerTierCents = 71_000n;
+  if (transferUsdCents <= firstThresholdCents) return 0n;
+  const tier = ((transferUsdCents - firstThresholdCents - 1n) / tierWidthCents) + 1n;
+  return tier * feePerTierCents;
+}
+
+function assetAtomsForUsdCents(usdCents: bigint, symbol: string, priceUsd: number) {
+  if (usdCents <= 0n) return 0n;
+  const priceMicros = decimalToMicros(priceUsd);
+  if (priceMicros <= 0n) throw new Error("Market price unavailable for network fee calculation");
+  const numerator = usdCents * (10n ** BigInt(decimalsFor(symbol))) * 1_000_000n;
+  const denominator = priceMicros * 100n;
+  return (numerator + denominator - 1n) / denominator;
 }
 
 function getDailySpentUsdCents(walletId: string, now: Date) {

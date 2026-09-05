@@ -48,6 +48,8 @@ interface TransferRow {
   recipient_external: number;
   asset_id: string;
   amount_atoms: string;
+  network_fee_atoms: string;
+  network_fee_usd_cents: number;
   settlement_mode: "immediate" | "scheduled";
   status: "pending" | "processing" | "completed" | "failed" | "cancelled";
   simulation: number;
@@ -394,6 +396,9 @@ function mapTransfer(row: TransferRow, now: Date) {
     amount: atomsToNumber(row.amount_atoms, row.symbol),
     amountAtoms: row.amount_atoms,
     amountDisplay: atomsToDecimalString(row.amount_atoms, row.symbol),
+    networkFee: atomsToNumber(row.network_fee_atoms || "0", row.symbol),
+    networkFeeAtoms: row.network_fee_atoms || "0",
+    networkFeeUsd: Number(row.network_fee_usd_cents || 0) / 100,
     settlementMode: row.settlement_mode,
     status: row.status,
     simulation: Boolean(row.simulation),

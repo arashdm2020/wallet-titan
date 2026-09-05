@@ -128,7 +128,7 @@ export default function TransferPage() {
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <WalletAddressDisplay address={transfer.senderDisplayAddress} network={transfer.network} label="Sender" />
-            <WalletAddressDisplay address={appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference)} network={transfer.network} label="Recipient" />
+            <WalletAddressDisplay address={transfer.senderRole === "USER" ? appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference) : transfer.recipientDisplayAddress} network={transfer.network} label="Recipient" />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
           <Info label="Network fee" value={transfer.networkFee > 0 ? `${formatCrypto(transfer.networkFee, transfer.symbol)} · ${formatUsd(transfer.networkFeeUsd)}` : "No fee"} />

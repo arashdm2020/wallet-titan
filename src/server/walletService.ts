@@ -66,6 +66,7 @@ interface TransferRow {
   name: string;
   network: string;
   sender_username: string;
+  sender_role: "ADMIN" | "USER";
   recipient_username: string;
   sender_display_address: string;
   recipient_display_address: string | null;
@@ -362,6 +363,7 @@ function getTransferRows(whereSql: string, params: SQLInputValue[]) {
     .prepare(
       `SELECT transfers.*, asset_definitions.symbol, asset_definitions.name, asset_definitions.network,
               sender_user.username AS sender_username,
+              sender_user.role AS sender_role,
               CASE WHEN transfers.recipient_external = 1 THEN 'External recipient' ELSE recipient_user.username END AS recipient_username,
               COALESCE(sender_address.display_address, '') AS sender_display_address,
               COALESCE(transfers.recipient_display_address, recipient_address.display_address, '') AS recipient_display_address
@@ -411,6 +413,7 @@ function mapTransfer(row: TransferRow, now: Date) {
     processingReason: row.processing_reason,
     networkBlockAtCreation: row.network_block_at_creation,
     senderUsername: row.sender_username,
+    senderRole: row.sender_role,
     recipientUsername: row.recipient_username,
     senderDisplayAddress: row.sender_display_address,
     recipientDisplayAddress: row.recipient_display_address,

@@ -83,6 +83,7 @@ export interface WalletTransfer {
   processingReason: string;
   networkBlockAtCreation: number;
   senderUsername: string;
+  senderRole: UserRole;
   recipientUsername: string;
   recipientExternal?: boolean;
   senderDisplayAddress: string;

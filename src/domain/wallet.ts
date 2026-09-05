@@ -9,6 +9,7 @@ export interface WalletUser {
   username: string;
   displayName: string;
   role: UserRole;
+  canSend: boolean;
 }
 
 export interface WalletAsset {

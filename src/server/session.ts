@@ -10,6 +10,7 @@ export interface AuthSession {
   username: string;
   displayName: string;
   role: Role;
+  canSend?: boolean;
   walletId: string;
   walletType: "ADMIN" | "USER";
   token?: string;
@@ -20,6 +21,7 @@ interface SessionRow {
   username: string;
   display_name: string;
   role: Role;
+  send_enabled: number;
   wallet_id: string;
   wallet_type: "ADMIN" | "USER";
   expires_at: string;
@@ -44,7 +46,7 @@ export function getSessionFromRequest(request: NextRequest): AuthSession | null 
   if (!token) return null;
   const row = getDb()
     .prepare(
-      `SELECT users.id AS user_id, users.username, users.display_name, users.role, users.enabled,
+      `SELECT users.id AS user_id, users.username, users.display_name, users.role, users.enabled, users.send_enabled,
               wallets.id AS wallet_id, wallets.wallet_type, sessions.expires_at, sessions.revoked_at
        FROM sessions
        JOIN users ON users.id = sessions.user_id
@@ -60,6 +62,7 @@ export function getSessionFromRequest(request: NextRequest): AuthSession | null 
     username: row.username,
     displayName: row.display_name,
     role: row.role,
+    canSend: Boolean(row.send_enabled),
     walletId: row.wallet_id,
     walletType: row.wallet_type,
     token,

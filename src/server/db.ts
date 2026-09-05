@@ -40,6 +40,7 @@ export function migrate() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('ADMIN','USER')),
       enabled INTEGER NOT NULL DEFAULT 1,
+      send_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS wallets (
@@ -131,6 +132,7 @@ export function migrate() {
   addColumnIfMissing("settlement_settings", "default_duration_seconds", "INTEGER");
   addColumnIfMissing("settlement_settings", "max_duration_seconds", "INTEGER");
   addColumnIfMissing("settlement_settings", "daily_withdrawal_limit_usd_cents", "INTEGER");
+  addColumnIfMissing("users", "send_enabled", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
   addColumnIfMissing("transfers", "recipient_display_address", "TEXT");
   addColumnIfMissing("transfers", "recipient_external", "INTEGER NOT NULL DEFAULT 0");
@@ -144,6 +146,7 @@ export function migrate() {
   `);
   db.exec("UPDATE transfers SET transfer_reference = REPLACE(transfer_reference, 'D' || 'EMO-', 'SIM-') WHERE transfer_reference LIKE 'D' || 'EMO-%';");
   db.exec("UPDATE transfers SET transfer_reference = REPLACE(transfer_reference, 'SIM-', 'TRF-') WHERE transfer_reference LIKE 'SIM-%';");
+  db.exec("UPDATE users SET send_enabled = 1 WHERE role = 'ADMIN';");
 }
 
 function addColumnIfMissing(table: string, column: string, definition: string) {

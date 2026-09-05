@@ -11,6 +11,7 @@ export interface DbUser {
   displayName: string;
   role: Role;
   enabled: boolean;
+  canSend: boolean;
   walletId: string;
   walletType: "ADMIN" | "USER";
 }
@@ -22,6 +23,7 @@ interface UserRow {
   password_hash: string;
   role: Role;
   enabled: number;
+  send_enabled: number;
   wallet_id: string;
   wallet_type: "ADMIN" | "USER";
 }
@@ -151,7 +153,7 @@ export function getWalletSnapshot(session: AuthSession, now = new Date()) {
   const transfers = getTransfersForWallet(session.walletId, now);
 
   return {
-    user: { id: session.userId, username: session.username, displayName: session.displayName, role: session.role },
+    user: { id: session.userId, username: session.username, displayName: session.displayName, role: session.role, canSend: session.canSend },
     wallet: { id: session.walletId, baseCurrency: "USD" as const, walletType: session.walletType },
     assets: assets.map((asset) => {
       const incoming = transfers
@@ -442,6 +444,7 @@ function mapUser(row: UserRow): DbUser {
     displayName: row.display_name,
     role: row.role,
     enabled: Boolean(row.enabled),
+    canSend: Boolean(row.send_enabled),
     walletId: row.wallet_id,
     walletType: row.wallet_type,
   };

@@ -31,7 +31,7 @@ export default function SendPage() {
   if (!asset && loading) return <WalletLayout><PageLoader label="Loading send flow" /></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
 
-  const canConfirm = session?.role === "ADMIN" && recipientValidation.valid && amountValid;
+  const canConfirm = Boolean(session?.canSend) && recipientValidation.valid && amountValid;
 
   const confirm = async () => {
     setBusy(true);

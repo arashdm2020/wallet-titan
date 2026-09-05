@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
         defaultDurationMinutes: body.defaultDurationMinutes ? Number(body.defaultDurationMinutes) : undefined,
         maxDurationSeconds: body.maxDurationSeconds ? Number(body.maxDurationSeconds) : undefined,
         maxDurationMinutes: body.maxDurationMinutes ? Number(body.maxDurationMinutes) : undefined,
+        dailyWithdrawalLimitUsdCents: body.dailyWithdrawalLimitUsdCents ? Number(body.dailyWithdrawalLimitUsdCents) : undefined,
         processingReason: String(body.processingReason || "Full ledger verification from block 0"),
         immediateEnabled: Boolean(body.immediateEnabled),
         scheduledEnabled: Boolean(body.scheduledEnabled),

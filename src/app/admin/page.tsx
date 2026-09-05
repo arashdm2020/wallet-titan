@@ -20,6 +20,7 @@ interface AdminSnapshot {
     default_duration_seconds?: number;
     max_duration_minutes: number;
     max_duration_seconds?: number;
+    daily_withdrawal_limit_usd_cents?: number;
     processing_reason: string;
   };
   transfers: WalletTransfer[];
@@ -221,6 +222,7 @@ function SettingsForm({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; o
   const [durationMinutes, setDurationMinutes] = useState(String(Math.floor((defaultSeconds % 3600) / 60)));
   const [maxDurationHours, setMaxDurationHours] = useState(String(Math.floor(maxSeconds / 3600)));
   const [maxDurationMinutes, setMaxDurationMinutes] = useState(String(Math.floor((maxSeconds % 3600) / 60)));
+  const [dailyLimitUsd, setDailyLimitUsd] = useState(String((snapshot.settings.daily_withdrawal_limit_usd_cents ?? 50_000_000) / 100));
   const [reason, setReason] = useState(snapshot.settings.processing_reason);
   const [immediateEnabled, setImmediateEnabled] = useState(Boolean(snapshot.settings.immediate_enabled));
   const [scheduledEnabled, setScheduledEnabled] = useState(Boolean(snapshot.settings.scheduled_enabled));
@@ -230,7 +232,7 @@ function SettingsForm({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; o
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit({ action: "updateSettings", defaultMode, defaultDurationSeconds, maxDurationSeconds, processingReason: reason, immediateEnabled, scheduledEnabled });
+        onSubmit({ action: "updateSettings", defaultMode, defaultDurationSeconds, maxDurationSeconds, dailyWithdrawalLimitUsdCents: Math.trunc(Number(dailyLimitUsd || 0) * 100), processingReason: reason, immediateEnabled, scheduledEnabled });
       }}
       className="mt-5 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100"
     >
@@ -250,6 +252,7 @@ function SettingsForm({ snapshot, onSubmit, busy }: { snapshot: AdminSnapshot; o
         <Field label="Max minutes" value={maxDurationMinutes} onChange={setMaxDurationMinutes} inputMode="numeric" />
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-500">Maximum duration: {formatDuration(maxDurationSeconds)}</p>
+      <Field label="Daily withdrawal limit (USD)" value={dailyLimitUsd} onChange={setDailyLimitUsd} inputMode="decimal" />
       <Field label="Processing reason" value={reason} onChange={setReason} />
       <Toggle label="Immediate enabled" checked={immediateEnabled} onChange={setImmediateEnabled} />
       <Toggle label="Scheduled enabled" checked={scheduledEnabled} onChange={setScheduledEnabled} />

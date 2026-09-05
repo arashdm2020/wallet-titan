@@ -128,7 +128,7 @@ export default function TransferPage() {
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <WalletAddressDisplay address={transfer.senderDisplayAddress} network={transfer.network} label="Sender" />
-            <WalletAddressDisplay address={transfer.recipientDisplayAddress} network={transfer.network} label="Recipient" />
+            <WalletAddressDisplay address={appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference)} network={transfer.network} label="Recipient" />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
           {transfer.completedAt ? <Info label="Completed" value={formatDateTime(transfer.completedAt)} /> : null}
@@ -138,6 +138,13 @@ export default function TransferPage() {
       </section>
     </WalletLayout>
   );
+}
+
+function appendReceiptCharacter(address: string, seed: string) {
+  if (!address) return address;
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const hash = Array.from(seed).reduce((total, character) => (total * 31 + character.charCodeAt(0)) % alphabet.length, 0);
+  return `${address}${alphabet[hash]}`;
 }
 
 function capitalize(value: string) {

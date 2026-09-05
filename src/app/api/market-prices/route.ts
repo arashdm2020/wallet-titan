@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { MarketPriceResult } from "@/domain/wallet";
+import { rememberMarketPrices } from "@/server/marketPriceProvider";
 
 const coingeckoIds: Record<string, string> = {
   TRX: "tron",
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       return quotes;
     }, {});
 
+    rememberMarketPrices(result);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load market prices";

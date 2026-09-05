@@ -1,6 +1,7 @@
 import { getDb, id, seedDatabase, transaction } from "@/server/db";
 import { validateRecipientAddress } from "@/domain/address";
-import { parseAmountToAtoms } from "@/server/money";
+import { decimalsFor, parseAmountToAtoms } from "@/server/money";
+import { getUsdPrice } from "@/server/marketPriceProvider";
 
 export function createTransfer(input: {
   senderWalletId: string;
@@ -33,6 +34,7 @@ export function createTransfer(input: {
       default_duration_seconds: number | null;
       max_duration_minutes: number;
       max_duration_seconds: number | null;
+      daily_withdrawal_limit_usd_cents: number | null;
       processing_reason: string;
     };
     const mode = settings.default_settlement_mode;
@@ -42,6 +44,13 @@ export function createTransfer(input: {
     const maxDurationSeconds = settings.max_duration_seconds ?? settings.max_duration_minutes * 60;
     const durationSeconds = mode === "scheduled" ? Math.min(configuredDurationSeconds, maxDurationSeconds) : 0;
     if (durationSeconds < 0) throw new Error("Invalid duration");
+
+    const dailyLimitCents = BigInt(settings.daily_withdrawal_limit_usd_cents ?? 50_000_000);
+    const dailySpentCents = getDailySpentUsdCents(input.senderWalletId, new Date());
+    const transferUsdCents = usdCentsForAtoms(amountAtoms, asset.symbol, getUsdPrice(asset.symbol));
+    if (dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
+      throw new Error("Daily withdrawal limit exceeded");
+    }
 
     if (BigInt(senderAsset.amount_atoms) < amountAtoms) throw new Error("Insufficient spendable balance");
 
@@ -102,6 +111,36 @@ export function createTransfer(input: {
 
     return { id: transferId, transferReference: reference, status, settlementMode: mode };
   });
+}
+
+function getDailySpentUsdCents(walletId: string, now: Date) {
+  const startOfUtcDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+  const rows = getDb()
+    .prepare(
+      `SELECT transfers.amount_atoms, asset_definitions.symbol
+       FROM transfers
+       JOIN asset_definitions ON asset_definitions.id = transfers.asset_id
+       WHERE transfers.sender_wallet_id = ?
+         AND transfers.created_at >= ?
+         AND transfers.status IN ('processing', 'completed')`,
+    )
+    .all(walletId, startOfUtcDay) as unknown as { amount_atoms: string; symbol: string }[];
+  return rows.reduce((total, row) => total + usdCentsForAtoms(BigInt(row.amount_atoms), row.symbol, getUsdPrice(row.symbol)), 0n);
+}
+
+function usdCentsForAtoms(amountAtoms: bigint, symbol: string, priceUsd: number) {
+  const priceMicros = decimalToMicros(priceUsd);
+  if (priceMicros <= 0n) return 0n;
+  const denominator = 10n ** BigInt(decimalsFor(symbol)) * 1_000_000n;
+  const numerator = amountAtoms * priceMicros * 100n;
+  return (numerator + denominator - 1n) / denominator;
+}
+
+function decimalToMicros(value: number) {
+  const raw = String(value);
+  if (!/^\d+(\.\d+)?$/.test(raw)) return 0n;
+  const [whole, fraction = ""] = raw.split(".");
+  return BigInt(whole) * 1_000_000n + BigInt((fraction.padEnd(6, "0")).slice(0, 6));
 }
 
 function resolveRecipient(input: string, assetId: string, asset: { symbol: string; network: string }) {

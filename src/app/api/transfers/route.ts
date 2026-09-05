@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = requireSession(request);
+    if (session.role !== "ADMIN") throw new Error("FORBIDDEN");
     const body = await request.json();
     const transfer = createTransfer({
       senderWalletId: session.walletId,

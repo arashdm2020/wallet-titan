@@ -67,7 +67,7 @@ export default function AssetDetailPage() {
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <ActionButton href={`/send/${asset.id}`} label="Send" disabled>↑</ActionButton>
+          <ActionButton href={`/send/${asset.id}`} label="Send" disabled={session?.role !== "ADMIN"}>↑</ActionButton>
           <ActionButton href={`/receive/${asset.id}`} label="Receive">↓</ActionButton>
         </div>
 

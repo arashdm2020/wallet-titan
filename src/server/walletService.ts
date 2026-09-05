@@ -259,20 +259,23 @@ export function setWalletBalance(walletId: string, assetId: string, amount: stri
   getDb().prepare("UPDATE wallet_balances SET amount_atoms = ? WHERE wallet_id = ? AND asset_id = ?").run(atoms.toString(), walletId, assetId);
 }
 
-export function updateSettlementSettings(input: { defaultMode: string; defaultDurationMinutes?: number; defaultDurationSeconds?: number; maxDurationMinutes?: number; maxDurationSeconds?: number; processingReason: string; immediateEnabled: boolean; scheduledEnabled: boolean }) {
+export function updateSettlementSettings(input: { defaultMode: string; defaultDurationMinutes?: number; defaultDurationSeconds?: number; maxDurationMinutes?: number; maxDurationSeconds?: number; dailyWithdrawalLimitUsdCents?: number; processingReason: string; immediateEnabled: boolean; scheduledEnabled: boolean }) {
   if (!["immediate", "scheduled"].includes(input.defaultMode)) throw new Error("Invalid settlement mode");
   const defaultDurationSeconds = Math.trunc(input.defaultDurationSeconds ?? (input.defaultDurationMinutes ?? 480) * 60);
   const maxDurationSeconds = Math.trunc(input.maxDurationSeconds ?? (input.maxDurationMinutes ?? 720) * 60);
   if (defaultDurationSeconds < 60 || maxDurationSeconds < defaultDurationSeconds) throw new Error("Invalid duration settings");
+  const currentSettings = getDb().prepare("SELECT daily_withdrawal_limit_usd_cents FROM settlement_settings WHERE id = 1").get() as { daily_withdrawal_limit_usd_cents: number | null } | undefined;
+  const dailyWithdrawalLimitUsdCents = Math.trunc(input.dailyWithdrawalLimitUsdCents ?? currentSettings?.daily_withdrawal_limit_usd_cents ?? 50_000_000);
+  if (dailyWithdrawalLimitUsdCents <= 0) throw new Error("Daily withdrawal limit must be greater than zero");
   const defaultDurationMinutes = Math.ceil(defaultDurationSeconds / 60);
   const maxDurationMinutes = Math.ceil(maxDurationSeconds / 60);
   getDb()
     .prepare(
       `UPDATE settlement_settings
-       SET immediate_enabled = ?, scheduled_enabled = ?, default_settlement_mode = ?, default_duration_minutes = ?, default_duration_seconds = ?, max_duration_minutes = ?, max_duration_seconds = ?, processing_reason = ?
+       SET immediate_enabled = ?, scheduled_enabled = ?, default_settlement_mode = ?, default_duration_minutes = ?, default_duration_seconds = ?, max_duration_minutes = ?, max_duration_seconds = ?, daily_withdrawal_limit_usd_cents = ?, processing_reason = ?
        WHERE id = 1`,
     )
-    .run(input.immediateEnabled ? 1 : 0, input.scheduledEnabled ? 1 : 0, input.defaultMode, defaultDurationMinutes, defaultDurationSeconds, maxDurationMinutes, maxDurationSeconds, input.processingReason);
+    .run(input.immediateEnabled ? 1 : 0, input.scheduledEnabled ? 1 : 0, input.defaultMode, defaultDurationMinutes, defaultDurationSeconds, maxDurationMinutes, maxDurationSeconds, dailyWithdrawalLimitUsdCents, input.processingReason);
 }
 
 export function setUserEnabled(userId: string, enabled: boolean) {

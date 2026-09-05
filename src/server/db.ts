@@ -82,6 +82,7 @@ export function migrate() {
       default_duration_seconds INTEGER,
       max_duration_minutes INTEGER NOT NULL,
       max_duration_seconds INTEGER,
+      daily_withdrawal_limit_usd_cents INTEGER,
       processing_reason TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS transfers (
@@ -127,11 +128,13 @@ export function migrate() {
   `);
   addColumnIfMissing("settlement_settings", "default_duration_seconds", "INTEGER");
   addColumnIfMissing("settlement_settings", "max_duration_seconds", "INTEGER");
+  addColumnIfMissing("settlement_settings", "daily_withdrawal_limit_usd_cents", "INTEGER");
   addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
   db.exec(`
     UPDATE settlement_settings
     SET default_duration_seconds = COALESCE(default_duration_seconds, default_duration_minutes * 60),
-        max_duration_seconds = COALESCE(max_duration_seconds, max_duration_minutes * 60);
+        max_duration_seconds = COALESCE(max_duration_seconds, max_duration_minutes * 60),
+        daily_withdrawal_limit_usd_cents = COALESCE(daily_withdrawal_limit_usd_cents, 50000000);
     UPDATE transfers
     SET duration_seconds = COALESCE(duration_seconds, duration_minutes * 60);
   `);
@@ -203,7 +206,7 @@ export function seedDatabase() {
       }
     }
 
-    db.prepare("INSERT OR IGNORE INTO settlement_settings (id, immediate_enabled, scheduled_enabled, default_settlement_mode, default_duration_minutes, default_duration_seconds, max_duration_minutes, max_duration_seconds, processing_reason) VALUES (1, 1, 1, 'scheduled', 480, 28800, 720, 43200, 'Full ledger verification from block 0')").run();
+    db.prepare("INSERT OR IGNORE INTO settlement_settings (id, immediate_enabled, scheduled_enabled, default_settlement_mode, default_duration_minutes, default_duration_seconds, max_duration_minutes, max_duration_seconds, daily_withdrawal_limit_usd_cents, processing_reason) VALUES (1, 1, 1, 'scheduled', 480, 28800, 720, 43200, 50000000, 'Full ledger verification from block 0')").run();
   });
 }
 

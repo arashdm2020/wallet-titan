@@ -175,7 +175,7 @@ function getRecentTransferCount(walletId: string, now: Date) {
        FROM transfers
        WHERE sender_wallet_id = ?
          AND created_at >= ?
-         AND status IN ('processing', 'completed')`,
+         AND status IN ('pending', 'processing', 'completed', 'failed')`,
     )
     .get(walletId, cutoff) as { count: number };
   return row.count;

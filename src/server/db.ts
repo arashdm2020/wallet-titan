@@ -136,6 +136,21 @@ export function migrate() {
   addColumnIfMissing("settlement_settings", "daily_withdrawal_limit_usd_cents", "INTEGER");
   addColumnIfMissing("users", "send_enabled", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("wallets", "send_blocked_until", "TEXT");
+  addColumnIfMissing("wallets", "transfer_cooldown_exempt", "INTEGER NOT NULL DEFAULT 0 CHECK(transfer_cooldown_exempt IN (0,1))");
+  const cooldownTrigger = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'one_transfer_per_wallet_24h'")
+    .get() as { sql: string } | undefined;
+  if (cooldownTrigger && !cooldownTrigger.sql.includes("transfer_cooldown_exempt")) {
+    transaction(() => db.exec(`
+      DROP TRIGGER one_transfer_per_wallet_24h;
+      CREATE TRIGGER one_transfer_per_wallet_24h BEFORE INSERT ON transfers
+      WHEN NOT EXISTS (SELECT 1 FROM wallets WHERE id = NEW.sender_wallet_id AND transfer_cooldown_exempt = 1)
+      AND EXISTS (SELECT 1 FROM transfers AS prior
+        WHERE prior.sender_wallet_id = NEW.sender_wallet_id
+          AND prior.status IN ('processing', 'completed')
+          AND julianday(prior.created_at) > julianday(NEW.created_at) - 1)
+      BEGIN SELECT RAISE(ABORT, 'Only one transfer per 24 hours'); END;
+    `));
+  }
   addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
   addColumnIfMissing("transfers", "network_fee_atoms", "TEXT NOT NULL DEFAULT '0'");
   addColumnIfMissing("transfers", "network_fee_usd_cents", "INTEGER NOT NULL DEFAULT 0");

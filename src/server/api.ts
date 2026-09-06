@@ -8,7 +8,13 @@ export function apiError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error";
   if (message === "UNAUTHENTICATED") return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (message === "FORBIDDEN") return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-  if (message === "Only one transfer per 24 hours" || message === "Daily withdrawal limit exceeded") {
+  if (message === "Daily withdrawal limit exceeded") {
+    return NextResponse.json(
+      { error: "Daily transfer limit reached. Your total transfer value per day is limited to $500,000 USD. Reduce the amount to fit your remaining daily allowance, or try again after the daily limit resets at 00:00 UTC." },
+      { status: 400 },
+    );
+  }
+  if (message === "Only one transfer per 24 hours") {
     return NextResponse.json(
       { error: "Transfer request limit reached. You can submit only one transfer request during a rolling 24-hour period, and your total transfer value per day is limited to $500,000 USD. Please try again after 24 hours or when your daily limit resets." },
       { status: 400 },

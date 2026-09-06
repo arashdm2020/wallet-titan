@@ -69,14 +69,6 @@ export default function TransferPage() {
     };
   }, [now, transfer]);
 
-  const eta = useMemo(() => {
-    if (!transfer?.availableAt || transfer.status !== "processing") return "";
-    const ms = Math.max(0, new Date(transfer.availableAt).getTime() - now);
-    const hours = Math.floor(ms / 3_600_000);
-    const minutes = Math.floor((ms % 3_600_000) / 60_000);
-    return `${hours}h ${minutes}m`;
-  }, [now, transfer]);
-
   if (error) return <WalletLayout><section className="p-6">{error}</section></WalletLayout>;
   if (!transfer) return <WalletLayout><PageLoader label="Loading transfer" /></WalletLayout>;
 
@@ -113,7 +105,6 @@ export default function TransferPage() {
               </div>
               <Info label="Processed" value={formatCrypto(display.processed, transfer.symbol)} />
               <Info label="Remaining" value={formatCrypto(display.remaining, transfer.symbol)} />
-              <Info label="Estimated completion" value={eta || formatDateTime(transfer.availableAt)} />
               <Info label="Duration" value={formatDuration(transfer.durationSeconds)} />
             </div>
           ) : transfer.status === "completed" ? (

@@ -5,6 +5,7 @@ import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
 import { StatusPill } from "@/components/StatusPill";
 import { WalletLayout } from "@/components/WalletLayout";
+import { TransferAccessNotice } from "@/components/TransferAccessNotice";
 import { useWalletStore } from "@/state/walletStore";
 import { formatCrypto, formatDateTime } from "@/utils/formatters";
 
@@ -18,6 +19,7 @@ export default function ActivityPage() {
       <section className="screen-enter px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <h1 className="text-2xl font-black">Activity</h1>
         <p className="mt-1 text-sm text-slate-500">Recent transfers</p>
+        <TransferAccessNotice />
 
         <div className="mt-4 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="divide-y divide-slate-100">

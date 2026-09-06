@@ -2,6 +2,8 @@ import { getDb, id, seedDatabase, transaction } from "@/server/db";
 import { validateRecipientAddress } from "@/domain/address";
 import { decimalsFor, parseAmountToAtoms } from "@/server/money";
 import { getUsdPrice } from "@/server/marketPriceProvider";
+import { getTransferAccess, TransferAccessError } from "@/server/transferAccess";
+import { isTransferBlocked } from "@/utils/transferAccess";
 
 export function createTransfer(input: {
   senderWalletId: string;
@@ -27,6 +29,8 @@ export function createTransfer(input: {
       )
       .get(input.senderWalletId, input.assetId) as { amount_atoms: string; sender_role: "ADMIN" | "USER" } | undefined;
     if (!senderAsset) throw new Error("Sender wallet does not support this asset");
+    const access = getTransferAccess(input.senderWalletId);
+    if (isTransferBlocked(access, Date.now())) throw new TransferAccessError(access);
 
     const recipient = resolveRecipient(input.recipient, input.assetId, asset);
     const recipientWalletId = recipient.wallet_id ?? input.senderWalletId;
@@ -58,9 +62,6 @@ export function createTransfer(input: {
     const networkFeeAtoms = assetAtomsForUsdCents(networkFeeUsdCents, asset.symbol, getUsdPrice(asset.symbol));
     const totalDebitAtoms = amountAtoms + networkFeeAtoms;
     const now = new Date();
-    if (senderAsset.sender_role !== "ADMIN" && getRecentTransferCount(input.senderWalletId, now) > 0) {
-      throw new Error("Only one transfer per 24 hours");
-    }
     if (senderAsset.sender_role !== "ADMIN" && dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
       throw new Error("Daily withdrawal limit exceeded");
     }
@@ -165,20 +166,6 @@ function getDailySpentUsdCents(walletId: string, now: Date) {
     )
     .all(walletId, startOfUtcDay) as unknown as { amount_atoms: string; symbol: string }[];
   return rows.reduce((total, row) => total + usdCentsForAtoms(BigInt(row.amount_atoms), row.symbol, getUsdPrice(row.symbol)), 0n);
-}
-
-function getRecentTransferCount(walletId: string, now: Date) {
-  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const row = getDb()
-    .prepare(
-      `SELECT COUNT(*) AS count
-       FROM transfers
-       WHERE sender_wallet_id = ?
-         AND created_at >= ?
-         AND status IN ('pending', 'processing', 'completed', 'failed')`,
-    )
-    .get(walletId, cutoff) as { count: number };
-  return row.count;
 }
 
 function usdCentsForAtoms(amountAtoms: bigint, symbol: string, priceUsd: number) {

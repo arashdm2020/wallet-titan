@@ -135,6 +135,7 @@ export function migrate() {
   addColumnIfMissing("settlement_settings", "max_duration_seconds", "INTEGER");
   addColumnIfMissing("settlement_settings", "daily_withdrawal_limit_usd_cents", "INTEGER");
   addColumnIfMissing("users", "send_enabled", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("wallets", "send_blocked_until", "TEXT");
   addColumnIfMissing("transfers", "duration_seconds", "INTEGER");
   addColumnIfMissing("transfers", "network_fee_atoms", "TEXT NOT NULL DEFAULT '0'");
   addColumnIfMissing("transfers", "network_fee_usd_cents", "INTEGER NOT NULL DEFAULT 0");

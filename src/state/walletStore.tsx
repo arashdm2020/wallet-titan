@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { MarketPriceResult, PortfolioSnapshot, WalletActivity, WalletAsset, WalletConfig, WalletTransfer, WalletUser } from "@/domain/wallet";
+import type { MarketPriceResult, PortfolioSnapshot, TransferAccess, WalletActivity, WalletAsset, WalletConfig, WalletTransfer, WalletUser } from "@/domain/wallet";
 import { marketPriceProvider } from "@/services/coinGeckoProvider";
 import { portfolioService } from "@/services/portfolioService";
 
@@ -16,6 +16,8 @@ interface WalletStoreValue {
   refreshing: boolean;
   error: string | null;
   now: number;
+  transferAccess: TransferAccess | null;
+  serverTimeOffset: number;
   refresh: (options?: { forcePrices?: boolean }) => Promise<void>;
   signIn: (username: string, password: string) => Promise<void>;
   createWallet: (input: { username: string; password: string; confirmPassword: string; displayName?: string }) => Promise<void>;
@@ -39,6 +41,8 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [transferAccess, setTransferAccess] = useState<TransferAccess | null>(null);
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
 
   const requestJson = useCallback(async <T,>(url: string, options?: RequestInit): Promise<T> => {
     const response = await fetch(url, {
@@ -46,7 +50,13 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
       headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || "Request failed");
+    if (!response.ok) {
+      if (data.transferAccess) {
+        setTransferAccess(data.transferAccess);
+        setServerTimeOffset(Date.parse(data.transferAccess.evaluatedAt) - Date.now());
+      }
+      throw new Error(data.error || "Request failed");
+    }
     return data as T;
   }, []);
 
@@ -55,6 +65,7 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
     const sessionData = await requestJson<{ session: WalletUser | null }>("/api/session");
     setSession(sessionData.session);
     if (!sessionData.session) {
+      setTransferAccess(null);
       setWallet(null);
       setActivities([]);
       setTransfers([]);
@@ -68,7 +79,11 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
       assets: WalletAsset[];
       activities: WalletActivity[];
       transfers: WalletTransfer[];
+      transferAccess: TransferAccess;
     }>("/api/wallet");
+
+    setTransferAccess(snapshot.transferAccess);
+    setServerTimeOffset(Date.parse(snapshot.transferAccess.evaluatedAt) - Date.now());
 
     const enabledSymbols = snapshot.assets.filter((asset) => asset.enabled).map((asset) => asset.symbol);
     const nextPrices = await marketPriceProvider.getPrices(enabledSymbols, { force: options.forcePrices });
@@ -146,6 +161,7 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
   const logout = useCallback(async () => {
     await requestJson("/api/auth/logout", { method: "POST", body: JSON.stringify({}) });
     setSession(null);
+    setTransferAccess(null);
     setWallet(null);
     setActivities([]);
     setTransfers([]);
@@ -165,8 +181,8 @@ export function WalletStoreProvider({ children }: { children: React.ReactNode })
   const getActivities = useCallback((assetId?: string) => (assetId ? activities.filter((activity) => activity.assetId === assetId) : activities), [activities]);
 
   const value = useMemo(
-    () => ({ session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, refresh, signIn, createWallet, updateDisplayName, logout, createTransfer, getAsset, getPortfolioAsset, getActivities }),
-    [session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, refresh, signIn, createWallet, updateDisplayName, logout, createTransfer, getAsset, getPortfolioAsset, getActivities],
+    () => ({ session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, transferAccess, serverTimeOffset, refresh, signIn, createWallet, updateDisplayName, logout, createTransfer, getAsset, getPortfolioAsset, getActivities }),
+    [session, wallet, portfolio, prices, activities, transfers, loading, refreshing, error, now, transferAccess, serverTimeOffset, refresh, signIn, createWallet, updateDisplayName, logout, createTransfer, getAsset, getPortfolioAsset, getActivities],
   );
 
   return <WalletStoreContext.Provider value={value}>{children}</WalletStoreContext.Provider>;

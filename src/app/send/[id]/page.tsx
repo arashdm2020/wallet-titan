@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { SendConnectionNotice } from "@/components/SendConnectionNotice";
+import { TransferAccessNotice } from "@/components/TransferAccessNotice";
+import { isTransferBlocked } from "@/utils/transferAccess";
 import { AssetIcon } from "@/components/AssetIcon";
 import { AuthRequired } from "@/components/AuthRequired";
 import { LoadingButtonContent, PageLoader } from "@/components/LoadingUI";
@@ -17,12 +20,15 @@ import { estimateNetworkFeeUsd } from "@/utils/networkFee";
 export default function SendPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { session, getPortfolioAsset, loading, createTransfer } = useWalletStore();
+  const { session, getPortfolioAsset, loading, createTransfer, transferAccess, now, serverTimeOffset, refresh } = useWalletStore();
   const asset = getPortfolioAsset(params.id);
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [editingRecipient, setEditingRecipient] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [acknowledgedAsset, setAcknowledgedAsset] = useState<string | null>(null);
+  const connectionAcknowledged = acknowledgedAsset === params.id;
+  useEffect(() => { void refresh(); }, [params.id, refresh]);
   const toast = useToast();
   const recipientValidation = useMemo(() => (asset ? validateRecipientAddress(recipient, asset) : { valid: false, error: "" }), [asset, recipient]);
   const numericAmount = Number(amount);
@@ -35,9 +41,10 @@ export default function SendPage() {
   if (!asset && loading) return <WalletLayout><PageLoader label="Loading send flow" /></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
 
-  const canConfirm = Boolean(session) && recipientValidation.valid && amountValid;
+  const canConfirm = Boolean(session) && recipientValidation.valid && amountValid && !busy && connectionAcknowledged && Boolean(transferAccess) && !isTransferBlocked(transferAccess, now + serverTimeOffset);
 
   const confirm = async () => {
+    if (!canConfirm) return;
     setBusy(true);
     try {
       const transfer = await createTransfer({ assetId: asset.id, recipient, amount });
@@ -53,8 +60,10 @@ export default function SendPage() {
 
   return (
     <WalletLayout>
+      {!connectionAcknowledged ? <SendConnectionNotice key={params.id} onAcknowledge={() => setAcknowledgedAsset(params.id)} onCancel={() => router.push(`/asset/${asset.id}`)} /> : null}
       <section className="screen-enter px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <Link href={`/asset/${asset.id}`} className="text-sm font-semibold text-blue-600">Back</Link>
+        <TransferAccessNotice />
         <div className="mt-3 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center gap-3">
             <AssetIcon asset={asset} />

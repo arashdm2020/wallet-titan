@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { TransferAccessError } from "@/server/transferAccess";
 
 export function apiError(error: unknown) {
+  if (error instanceof TransferAccessError) {
+    return NextResponse.json({ error: error.message, transferAccess: error.access }, { status: 429, headers: { "Cache-Control": "no-store" } });
+  }
   const message = error instanceof Error ? error.message : "Unexpected error";
   if (message === "UNAUTHENTICATED") return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (message === "FORBIDDEN") return NextResponse.json({ error: "Admin access required" }, { status: 403 });

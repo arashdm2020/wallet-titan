@@ -4,6 +4,14 @@ export type UserRole = "ADMIN" | "USER";
 export type SettlementMode = "immediate" | "scheduled";
 export type TransferStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
 
+export interface TransferAccess {
+  lastTransferId: string | null;
+  lastTransferReference: string | null;
+  lastTransferAt: string | null;
+  blockedUntil: string | null;
+  evaluatedAt: string;
+}
+
 export interface WalletUser {
   id: string;
   username: string;

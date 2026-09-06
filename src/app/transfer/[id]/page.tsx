@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { PageLoader } from "@/components/LoadingUI";
 import { WalletLayout } from "@/components/WalletLayout";
+import { TransferAccessNotice } from "@/components/TransferAccessNotice";
 import type { WalletTransfer } from "@/domain/wallet";
 import { formatCrypto, formatDateTime, formatUsd } from "@/utils/formatters";
 
@@ -131,6 +132,7 @@ export default function TransferPage() {
             <WalletAddressDisplay address={transfer.senderRole === "USER" ? appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference) : transfer.recipientDisplayAddress} network={transfer.network} label="Recipient" />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
+          <TransferAccessNotice transferId={transfer.id} />
           <Info label="Network fee" value={transfer.networkFee > 0 ? `${formatCrypto(transfer.networkFee, transfer.symbol)} · ${formatUsd(transfer.networkFeeUsd)}` : "No fee"} />
           {transfer.completedAt ? <Info label="Completed" value={formatDateTime(transfer.completedAt)} /> : null}
           <Info label="Reason" value={transfer.processingReason} />

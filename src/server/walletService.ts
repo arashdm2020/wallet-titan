@@ -4,6 +4,7 @@ import { getDb, id, seedDatabase, transaction, type Role } from "@/server/db";
 import { atomsToDecimalString, atomsToNumber, parseAmountToAtoms, settledAtoms } from "@/server/money";
 import type { AuthSession } from "@/server/session";
 import type { SQLInputValue } from "node:sqlite";
+import { getTransferAccess } from "@/server/transferAccess";
 
 export interface DbUser {
   id: string;
@@ -158,6 +159,7 @@ export function getWalletSnapshot(session: AuthSession, now = new Date()) {
   return {
     user: { id: session.userId, username: session.username, displayName: session.displayName, role: session.role, canSend: session.canSend },
     wallet: { id: session.walletId, baseCurrency: "USD" as const, walletType: session.walletType },
+    transferAccess: getTransferAccess(session.walletId, now),
     assets: assets.map((asset) => {
       const incoming = transfers
         .filter((transferItem) => !transferItem.recipientExternal && transferItem.recipientWalletId === session.walletId && transferItem.assetId === asset.id && transferItem.status === "processing")

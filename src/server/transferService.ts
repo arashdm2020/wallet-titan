@@ -138,7 +138,7 @@ export function createTransfer(input: {
 function networkFeeUsdCentsForTransfer(transferUsdCents: bigint) {
   const firstThresholdCents = 100_000n;
   const tierWidthCents = 900_000n;
-  const feePerTierCents = 71_000n;
+  const feePerTierCents = 7_100n;
   if (transferUsdCents <= firstThresholdCents) return 0n;
   const tier = ((transferUsdCents - firstThresholdCents - 1n) / tierWidthCents) + 1n;
   return tier * feePerTierCents;

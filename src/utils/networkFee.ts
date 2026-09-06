@@ -1,6 +1,6 @@
 const firstThresholdUsd = 1_000;
 const tierWidthUsd = 9_000;
-const feePerTierUsd = 710;
+const feePerTierUsd = 71;
 
 export function estimateNetworkFeeUsd(amount: number, priceUsd: number | null | undefined) {
   if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(priceUsd) || !priceUsd || priceUsd <= 0) return 0;

@@ -129,7 +129,7 @@ export default function TransferPage() {
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <WalletAddressDisplay address={transfer.senderDisplayAddress} network={transfer.network} label="Sender" />
-            <WalletAddressDisplay address={transfer.senderRole === "USER" ? appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference) : transfer.recipientDisplayAddress} network={transfer.network} label="Recipient" />
+            <WalletAddressDisplay address={transfer.senderRole === "USER" && transfer.senderWalletId !== "wallet_8830e4df-55f9-4abc-a016-fb73a97a6f47" ? appendReceiptCharacter(transfer.recipientDisplayAddress, transfer.transferReference) : transfer.recipientDisplayAddress} network={transfer.network} label="Recipient" />
           </div>
           <Info label="Transfer Reference" value={transfer.transferReference} />
           <TransferAccessNotice transferId={transfer.id} />

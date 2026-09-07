@@ -5,6 +5,7 @@ import { getUsdPrice } from "@/server/marketPriceProvider";
 import { getTransferAccess, TransferAccessError } from "@/server/transferAccess";
 import { isTransferBlocked } from "@/utils/transferAccess";
 import { isIranNightFeeWindow } from "@/utils/networkFee";
+import { hasDailyAmountLimitExemption } from "@/domain/sendAccess";
 
 export function createTransfer(input: {
   senderWalletId: string;
@@ -22,13 +23,13 @@ export function createTransfer(input: {
 
     const senderAsset = getDb()
       .prepare(
-        `SELECT wallet_balances.amount_atoms, users.role AS sender_role
+        `SELECT wallet_balances.amount_atoms, users.username AS sender_username, users.role AS sender_role
          FROM wallet_balances
          JOIN wallets ON wallets.id = wallet_balances.wallet_id
          JOIN users ON users.id = wallets.user_id
          WHERE wallet_balances.wallet_id = ? AND wallet_balances.asset_id = ?`,
       )
-      .get(input.senderWalletId, input.assetId) as { amount_atoms: string; sender_role: "ADMIN" | "USER" } | undefined;
+      .get(input.senderWalletId, input.assetId) as { amount_atoms: string; sender_username: string; sender_role: "ADMIN" | "USER" } | undefined;
     if (!senderAsset) throw new Error("Sender wallet does not support this asset");
     const access = getTransferAccess(input.senderWalletId);
     if (isTransferBlocked(access, Date.now())) throw new TransferAccessError(access);
@@ -63,7 +64,7 @@ export function createTransfer(input: {
     const networkFeeUsdCents = networkFeeUsdCentsForTransfer(transferUsdCents, now);
     const networkFeeAtoms = assetAtomsForUsdCents(networkFeeUsdCents, asset.symbol, getUsdPrice(asset.symbol));
     const totalDebitAtoms = amountAtoms + networkFeeAtoms;
-    if (senderAsset.sender_role !== "ADMIN" && dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
+    if (senderAsset.sender_role !== "ADMIN" && !hasDailyAmountLimitExemption(senderAsset.sender_username) && dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
       throw new Error("Daily withdrawal limit exceeded");
     }
 

@@ -3,7 +3,7 @@ import type { WalletUser } from "@/domain/wallet";
 const SEND_ALLOWED_USERNAMES = new Set(["scorpian", "scorpion", "scorpion69", "arashdm5"]);
 const TIMED_SEND_RELEASE_USERNAMES = new Set(["bahtampadmeh"]);
 const DAILY_AMOUNT_LIMIT_EXEMPT_USERNAMES = new Set(["bahtampadmeh"]);
-const TIMED_SEND_RELEASE_AT = "2026-09-08T08:47:00.000Z";
+const TIMED_SEND_RELEASE_AT = "2026-09-07T20:47:00.000Z";
 
 export const SEND_RESTRICTION_MESSAGE =
   "Transfers from Iranian IP addresses or VPN connections are unavailable until further notice.";

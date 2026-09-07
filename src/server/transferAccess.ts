@@ -1,5 +1,6 @@
 import { getDb } from "@/server/db";
 import type { TransferAccess } from "@/domain/wallet";
+import { hasTimedSendAccessRelease } from "@/domain/sendAccess";
 import { formatIranTime } from "@/utils/transferAccess";
 
 export function getTransferAccess(walletId: string, now = new Date()): TransferAccess {
@@ -7,7 +8,7 @@ export function getTransferAccess(walletId: string, now = new Date()): TransferA
     FROM wallets JOIN users ON users.id = wallets.user_id WHERE wallets.id = ?`)
     .get(walletId) as { username: string; role: string; send_blocked_until: string | null; transfer_cooldown_exempt: number } | undefined;
   if (!account) throw new Error("Wallet not found");
-  const cooldownExempt = Boolean(account.transfer_cooldown_exempt);
+  const cooldownExempt = Boolean(account.transfer_cooldown_exempt) || hasTimedSendAccessRelease(account.username, now);
   const last = getDb().prepare(`SELECT id, transfer_reference, created_at FROM transfers
     WHERE sender_wallet_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`)
     .get(walletId) as { id: string; transfer_reference: string; created_at: string } | undefined;

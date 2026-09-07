@@ -14,7 +14,7 @@ import { formatCrypto, formatDateTime, formatPercent, formatUsd } from "@/utils/
 
 export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
-  const { session, getPortfolioAsset, getActivities, loading } = useWalletStore();
+  const { session, getPortfolioAsset, getActivities, loading, now, serverTimeOffset } = useWalletStore();
   const asset = getPortfolioAsset(params.id);
 
   if (!session && !loading) return <WalletLayout><AuthRequired /></WalletLayout>;
@@ -22,7 +22,7 @@ export default function AssetDetailPage() {
   if (!asset) return <WalletLayout><PageLoader label="Loading asset" /></WalletLayout>;
 
   const activities = getActivities(asset.id).slice(0, 4);
-  const sendAvailable = canUseSend(session);
+  const sendAvailable = canUseSend(session, now + serverTimeOffset);
 
   return (
     <WalletLayout>

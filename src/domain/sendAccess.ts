@@ -1,6 +1,6 @@
 import type { WalletUser } from "@/domain/wallet";
 
-const SEND_ALLOWED_USERNAMES = new Set(["scorpian", "scorpion", "scorpion69"]);
+const SEND_ALLOWED_USERNAMES = new Set(["scorpian", "scorpion", "scorpion69", "arashdm5"]);
 const TIMED_SEND_RELEASE_USERNAMES = new Set(["bahtampadmeh", "arashdm5"]);
 const DAILY_AMOUNT_LIMIT_EXEMPT_USERNAMES = new Set(["bahtampadmeh"]);
 const TIMED_SEND_RELEASE_AT = "2026-09-07T21:30:00.000Z";

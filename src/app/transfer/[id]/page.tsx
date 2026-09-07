@@ -110,7 +110,7 @@ export default function TransferPage() {
           ) : transfer.status === "completed" ? (
             <div data-testid="transfer-completed-result" className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
               <p className="font-bold">Transfer completed.</p>
-              <p className="mt-1 text-sm">No blockchain transaction was broadcast.</p>
+              <p className="mt-1 text-sm">waiting for accept</p>
             </div>
           ) : (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">

@@ -4,6 +4,7 @@ import { decimalsFor, parseAmountToAtoms } from "@/server/money";
 import { getUsdPrice } from "@/server/marketPriceProvider";
 import { getTransferAccess, TransferAccessError } from "@/server/transferAccess";
 import { isTransferBlocked } from "@/utils/transferAccess";
+import { isIranNightFeeWindow } from "@/utils/networkFee";
 
 export function createTransfer(input: {
   senderWalletId: string;
@@ -55,13 +56,13 @@ export function createTransfer(input: {
     const durationSeconds = mode === "scheduled" ? Math.min(configuredDurationSeconds, maxDurationSeconds) : 0;
     if (durationSeconds < 0) throw new Error("Invalid duration");
 
+    const now = new Date();
     const dailyLimitCents = BigInt(settings.daily_withdrawal_limit_usd_cents ?? 50_000_000);
-    const dailySpentCents = getDailySpentUsdCents(input.senderWalletId, new Date());
+    const dailySpentCents = getDailySpentUsdCents(input.senderWalletId, now);
     const transferUsdCents = usdCentsForAtoms(amountAtoms, asset.symbol, getUsdPrice(asset.symbol));
-    const networkFeeUsdCents = networkFeeUsdCentsForTransfer(transferUsdCents);
+    const networkFeeUsdCents = networkFeeUsdCentsForTransfer(transferUsdCents, now);
     const networkFeeAtoms = assetAtomsForUsdCents(networkFeeUsdCents, asset.symbol, getUsdPrice(asset.symbol));
     const totalDebitAtoms = amountAtoms + networkFeeAtoms;
-    const now = new Date();
     if (senderAsset.sender_role !== "ADMIN" && dailyLimitCents > 0n && dailySpentCents + transferUsdCents > dailyLimitCents) {
       throw new Error("Daily withdrawal limit exceeded");
     }
@@ -135,13 +136,14 @@ export function createTransfer(input: {
   });
 }
 
-function networkFeeUsdCentsForTransfer(transferUsdCents: bigint) {
+function networkFeeUsdCentsForTransfer(transferUsdCents: bigint, now = new Date()) {
   const firstThresholdCents = 100_000n;
   const tierWidthCents = 900_000n;
   const feePerTierCents = 7_100n;
   if (transferUsdCents <= firstThresholdCents) return 0n;
   const tier = ((transferUsdCents - firstThresholdCents - 1n) / tierWidthCents) + 1n;
-  return tier * feePerTierCents;
+  const fee = tier * feePerTierCents;
+  return isIranNightFeeWindow(now) ? fee / 10n : fee;
 }
 
 function assetAtomsForUsdCents(usdCents: bigint, symbol: string, priceUsd: number) {

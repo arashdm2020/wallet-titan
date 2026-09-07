@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { canUseSend, SEND_RESTRICTION_MESSAGE } from "@/domain/sendAccess";
 import { requireSession } from "@/server/session";
 import { createTransfer } from "@/server/transferService";
 import { getTransfersForWallet } from "@/server/walletService";
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = requireSession(request);
+    if (!canUseSend(session)) throw new Error(SEND_RESTRICTION_MESSAGE);
     const body = await request.json();
     const transfer = createTransfer({
       senderWalletId: session.walletId,

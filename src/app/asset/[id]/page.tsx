@@ -8,6 +8,7 @@ import { AssetIcon } from "@/components/AssetIcon";
 import { PageLoader } from "@/components/LoadingUI";
 import { StatusPill } from "@/components/StatusPill";
 import { WalletLayout } from "@/components/WalletLayout";
+import { canUseSend, SEND_RESTRICTION_MESSAGE } from "@/domain/sendAccess";
 import { useWalletStore } from "@/state/walletStore";
 import { formatCrypto, formatDateTime, formatPercent, formatUsd } from "@/utils/formatters";
 
@@ -21,6 +22,7 @@ export default function AssetDetailPage() {
   if (!asset) return <WalletLayout><PageLoader label="Loading asset" /></WalletLayout>;
 
   const activities = getActivities(asset.id).slice(0, 4);
+  const sendAvailable = canUseSend(session);
 
   return (
     <WalletLayout>
@@ -67,9 +69,14 @@ export default function AssetDetailPage() {
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <ActionButton href={`/send/${asset.id}`} label="Send">↑</ActionButton>
+          <ActionButton href={`/send/${asset.id}`} label="Send" disabled={!sendAvailable}>↑</ActionButton>
           <ActionButton href={`/receive/${asset.id}`} label="Receive">↓</ActionButton>
         </div>
+        {!sendAvailable ? (
+          <div className="mt-3 rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+            {SEND_RESTRICTION_MESSAGE}
+          </div>
+        ) : null}
 
         <div className="mt-3 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <p className="font-bold">Wallet account</p>

@@ -13,6 +13,7 @@ import { useToast } from "@/components/ToastProvider";
 import { WalletAddressDisplay } from "@/components/WalletAddressDisplay";
 import { WalletLayout } from "@/components/WalletLayout";
 import { validateRecipientAddress } from "@/domain/address";
+import { canUseSend, SEND_RESTRICTION_MESSAGE } from "@/domain/sendAccess";
 import { useWalletStore } from "@/state/walletStore";
 import { formatCrypto, formatUsd } from "@/utils/formatters";
 import { estimateNetworkFeeUsd } from "@/utils/networkFee";
@@ -41,9 +42,14 @@ export default function SendPage() {
   if (!asset && loading) return <WalletLayout><PageLoader label="Loading send flow" /></WalletLayout>;
   if (!asset) return <WalletLayout><div className="p-6">Asset not found</div></WalletLayout>;
 
-  const canConfirm = Boolean(session) && recipientValidation.valid && amountValid && !busy && connectionAcknowledged && Boolean(transferAccess) && !isTransferBlocked(transferAccess, now + serverTimeOffset);
+  const sendAvailable = canUseSend(session);
+  const canConfirm = sendAvailable && recipientValidation.valid && amountValid && !busy && connectionAcknowledged && Boolean(transferAccess) && !isTransferBlocked(transferAccess, now + serverTimeOffset);
 
   const confirm = async () => {
+    if (!sendAvailable) {
+      toast({ tone: "info", title: "Transfer unavailable", description: SEND_RESTRICTION_MESSAGE });
+      return;
+    }
     if (!canConfirm) return;
     setBusy(true);
     try {
@@ -60,10 +66,10 @@ export default function SendPage() {
 
   return (
     <WalletLayout>
-      {!connectionAcknowledged ? <SendConnectionNotice key={params.id} onAcknowledge={() => setAcknowledgedAsset(params.id)} onCancel={() => router.push(`/asset/${asset.id}`)} /> : null}
+      {sendAvailable && !connectionAcknowledged ? <SendConnectionNotice key={params.id} onAcknowledge={() => setAcknowledgedAsset(params.id)} onCancel={() => router.push(`/asset/${asset.id}`)} /> : null}
       <section className="screen-enter px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <Link href={`/asset/${asset.id}`} className="text-sm font-semibold text-blue-600">Back</Link>
-        <TransferAccessNotice />
+        {sendAvailable ? <TransferAccessNotice /> : null}
         <div className="mt-3 rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center gap-3">
             <AssetIcon asset={asset} />
@@ -72,6 +78,11 @@ export default function SendPage() {
               <p className="text-sm text-slate-500">Available {formatCrypto(asset.availableBalance ?? asset.balance, asset.symbol)}</p>
             </div>
           </div>
+          {!sendAvailable ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              {SEND_RESTRICTION_MESSAGE}
+            </div>
+          ) : null}
 
           <label className="mt-6 block text-sm font-semibold text-slate-600" htmlFor="address">Recipient wallet</label>
           {recipient && recipientValidation.valid && !editingRecipient ? (
